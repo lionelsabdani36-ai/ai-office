@@ -64,7 +64,7 @@ export interface AgentActivitySnapshot { agents: AgentActivity[]; fetchedAt: str
 export interface OfficeSnapshot { stations: OfficeStation[]; summary: OfficeSummary; fetchedAt: string }
 export interface OfficeSummary { declared: number; active: number; idle: number; offline: number; unknown: number; gatewaysReachable: number; gatewaysDeclared: number }
 export interface ExplicitOfficeState { station: OfficeStation['name']; state: 'Working' | 'Reviewing' | 'Collaborating'; expiresAt: string }
-export interface OfficeBuildOptions { now?: string | number; explicitStates?: ExplicitOfficeState[]; agentActivity?: AgentActivitySnapshot; federatedAgents?: Array<{ id: string; name: string; role: string }> }
+export interface OfficeBuildOptions { now?: string | number; explicitStates?: ExplicitOfficeState[]; agentActivity?: AgentActivitySnapshot; federatedAgents?: Array<{ id: string; name: string; role?: string; description?: string }> }
 export interface UsageInsights {
   days: number
   sessions: number
@@ -822,14 +822,14 @@ export async function collectAgentActivity(profiles: readonly string[], run: Run
 /** One office station per agent: every Hermes profile, plus OpenCode when it is installed. */
 interface AgentSpec { id: string; role: string; profile?: string; gateway?: GatewayState; aliases: string[] }
 
-export function agentRoster(runtime: RuntimeSnapshot, federated?: Array<{ id: string; name: string; role?: string }>): AgentSpec[] {
+export function agentRoster(runtime: RuntimeSnapshot, federated?: Array<{ id: string; name: string; role?: string; description?: string }>): AgentSpec[] {
   const profiles = runtime.profiles.availability === 'available' ? runtime.profiles.data : []
   const agents: AgentSpec[] = profiles.filter((profile) => PROFILE_NAME.test(profile.name)).map((profile) => ({ id: profile.name, role: 'Hermes profile', profile: profile.name, gateway: profile.gateway, aliases: [profile.name.toLowerCase()] }))
   if (runtime.openCode.availability === 'available' && !agents.some((agent) => agent.id === 'opencode')) agents.push({ id: 'opencode', role: 'OpenCode', aliases: ['opencode', 'open-code'] })
   if (Array.isArray(federated)) {
     for (const fed of federated) {
       if (!agents.some((a) => a.id.toLowerCase() === fed.id.toLowerCase())) {
-        agents.push({ id: fed.name || fed.id, role: fed.role || 'Guest Agent', aliases: [fed.id.toLowerCase(), (fed.name || '').toLowerCase()] })
+        agents.push({ id: fed.name || fed.id, role: fed.role || fed.description || 'Guest Agent', aliases: [fed.id.toLowerCase(), (fed.name || '').toLowerCase()] })
       }
     }
   }
@@ -1062,12 +1062,27 @@ export async function getTaskDetail(id: string, now = Date.now(), board?: string
 }
 
 export async function getOffice(now = Date.now()): Promise<OfficeSnapshot> {
-  const [runtime, board, activity, agentActivity] = await Promise.all([getSnapshot(now), getTaskBoard(now), getActivity(now), agentActivitySource(now)])
-  return buildOfficeSnapshot(runtime, board, activity, { agentActivity })
+  const [runtime, board, activity, agentActivity, federated] = await Promise.all([
+    getSnapshot(now),
+    getTaskBoard(now),
+    getActivity(now),
+    agentActivitySource(now),
+    loadFederatedAgents().catch(() => []),
+  ])
+  return buildOfficeSnapshot(runtime, board, activity, { agentActivity, federatedAgents: federated })
 }
 
 export async function getDashboard(now = Date.now()): Promise<DashboardSnapshot> {
-  const [runtime, board, calendar, activity, knowledge, channels, agentActivity] = await Promise.all([getSnapshot(now), getTaskBoard(now), getCalendar(now), getActivity(now), getKnowledge(now), getChannels(now), agentActivitySource(now)])
-  const office = buildOfficeSnapshot(runtime, board, activity, { agentActivity })
+  const [runtime, board, calendar, activity, knowledge, channels, agentActivity, federated] = await Promise.all([
+    getSnapshot(now),
+    getTaskBoard(now),
+    getCalendar(now),
+    getActivity(now),
+    getKnowledge(now),
+    getChannels(now),
+    agentActivitySource(now),
+    loadFederatedAgents().catch(() => []),
+  ])
+  const office = buildOfficeSnapshot(runtime, board, activity, { agentActivity, federatedAgents: federated })
   return buildDashboard({ runtime, board, calendar, activity, knowledge, channels, office, commands: commandHealth() })
 }
