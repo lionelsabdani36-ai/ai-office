@@ -56,6 +56,46 @@ describe('Security Hardening & Cyber Defense Verification', () => {
       expect(cleaned).toContain('&lt;script&gt;')
       expect(cleaned).toContain('&lt;img src=x onerror=alert(1)&gt;')
     })
+
+    it('neutralizes SVG onload and embedded event vectors', () => {
+      const svgPayload = "<svg/onload=alert('SVG_XSS')>"
+      const cleanedSvg = sanitizeText(svgPayload)
+      expect(cleanedSvg).toBe("&lt;svg/onload=alert(&#39;SVG_XSS&#39;)&gt;")
+      expect(cleanedSvg).not.toContain('<svg')
+      expect(cleanedSvg).not.toContain('>')
+
+      const complexSvg = `<svg><script>alert('SVG_SCRIPT')</script><animate onbegin=alert(1) attributeName=x dur=1s></svg>`
+      const cleanedComplex = sanitizeText(complexSvg)
+      expect(cleanedComplex).not.toContain('<svg>')
+      expect(cleanedComplex).not.toContain('<script>')
+      expect(cleanedComplex).not.toContain('<animate')
+      expect(cleanedComplex).toContain('&lt;svg&gt;&lt;script&gt;')
+    })
+
+    it('neutralizes attribute breakout vectors', () => {
+      const breakoutPayload = `"><svg/onload=alert(document.cookie)>`
+      const cleanedBreakout = sanitizeText(breakoutPayload)
+      expect(cleanedBreakout).toBe('&quot;&gt;&lt;svg/onload=alert(document.cookie)&gt;')
+    })
+
+    it('neutralizes iframe javascript protocol and srcdoc injection vectors', () => {
+      const iframeJsPayload = `<iframe src="javascript:alert('IFRAME')"></iframe>`
+      const cleanedIframeJs = sanitizeText(iframeJsPayload)
+      expect(cleanedIframeJs).toBe('&lt;iframe src=&quot;javascript:alert(&#39;IFRAME&#39;)&quot;&gt;&lt;/iframe&gt;')
+      expect(cleanedIframeJs).not.toContain('<iframe')
+      expect(cleanedIframeJs).not.toContain('</iframe>')
+
+      const iframeSrcdocPayload = `<iframe srcdoc="<script>alert('IFRAME_SRCDOC')</script>"></iframe>`
+      const cleanedIframeSrcdoc = sanitizeText(iframeSrcdocPayload)
+      expect(cleanedIframeSrcdoc).toBe('&lt;iframe srcdoc=&quot;&lt;script&gt;alert(&#39;IFRAME_SRCDOC&#39;)&lt;/script&gt;&quot;&gt;&lt;/iframe&gt;')
+      expect(cleanedIframeSrcdoc).not.toContain('<iframe')
+      expect(cleanedIframeSrcdoc).not.toContain('<script')
+
+      const caseVariant = `<IFRAME SRC="javascript:alert('XSS')"></IFRAME>`
+      const cleanedCase = sanitizeText(caseVariant)
+      expect(cleanedCase).toBe('&lt;IFRAME SRC=&quot;javascript:alert(&#39;XSS&#39;)&quot;&gt;&lt;/IFRAME&gt;')
+      expect(cleanedCase).not.toContain('<IFRAME')
+    })
   })
 
   describe('Cryptographic Session Tokens & Offline Forgery Immunity', () => {
