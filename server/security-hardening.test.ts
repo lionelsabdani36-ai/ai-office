@@ -57,6 +57,22 @@ describe('Security Hardening & Cyber Defense Verification', () => {
       expect(cleaned).toContain('&lt;img src=x onerror=alert(1)&gt;')
     })
 
+    it('neutralizes classic inline script execution vector <script>alert(1)</script>', () => {
+      const scriptPayload = '<script>alert(1)</script>'
+      const cleanedScript = sanitizeText(scriptPayload)
+      expect(cleanedScript).toBe('&lt;script&gt;alert(1)&lt;/script&gt;')
+      expect(cleanedScript).not.toContain('<script>')
+      expect(cleanedScript).not.toContain('</script>')
+      expect(cleanedScript).not.toContain('<')
+      expect(cleanedScript).not.toContain('>')
+
+      const upperCaseScript = '<SCRIPT>alert(1)</SCRIPT>'
+      const cleanedUpper = sanitizeText(upperCaseScript)
+      expect(cleanedUpper).toBe('&lt;SCRIPT&gt;alert(1)&lt;/SCRIPT&gt;')
+      expect(cleanedUpper).not.toContain('<SCRIPT>')
+      expect(cleanedUpper).not.toContain('</SCRIPT>')
+    })
+
     it('neutralizes SVG onload and embedded event vectors', () => {
       const svgPayload = "<svg/onload=alert('SVG_XSS')>"
       const cleanedSvg = sanitizeText(svgPayload)
