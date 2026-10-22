@@ -80,6 +80,22 @@ describe('Security Hardening & Cyber Defense Verification', () => {
       expect(cleanedSvg).not.toContain('<svg')
       expect(cleanedSvg).not.toContain('>')
 
+      // Task t_194b72d8 specific compact probe vector: <svg/onload=alert(1)>
+      const compactSvg = '<svg/onload=alert(1)>'
+      const cleanedCompact = sanitizeText(compactSvg)
+      expect(cleanedCompact).toBe('&lt;svg/onload=alert(1)&gt;')
+      expect(cleanedCompact).not.toContain('<svg')
+      expect(cleanedCompact).not.toContain('>')
+
+      const upperCompact = '<SVG/ONLOAD=ALERT(1)>'
+      const cleanedUpperCompact = sanitizeText(upperCompact)
+      expect(cleanedUpperCompact).toBe('&lt;SVG/ONLOAD=ALERT(1)&gt;')
+      expect(cleanedUpperCompact).not.toContain('<SVG')
+
+      const spacedSvg = '<svg onload="alert(1)">'
+      const cleanedSpaced = sanitizeText(spacedSvg)
+      expect(cleanedSpaced).toBe('&lt;svg onload=&quot;alert(1)&quot;&gt;')
+
       const complexSvg = `<svg><script>alert('SVG_SCRIPT')</script><animate onbegin=alert(1) attributeName=x dur=1s></svg>`
       const cleanedComplex = sanitizeText(complexSvg)
       expect(cleanedComplex).not.toContain('<svg>')
