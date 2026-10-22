@@ -256,6 +256,63 @@ describe('Security Hardening & Cyber Defense Verification', () => {
       expect(cleanedRecursive).not.toContain('<')
       expect(cleanedRecursive).not.toContain('>')
     })
+
+    it('neutralizes multi-vector combination payloads (task t_0ba3d7d3)', () => {
+      // Title payload: Probe XSS <script>alert('QA_XSS')</script><svg onload=alert(1)>
+      const titlePayload = "Probe XSS <script>alert('QA_XSS')</script><svg onload=alert(1)>"
+      const cleanedTitle = sanitizeText(titlePayload)
+      expect(cleanedTitle).toBe("Probe XSS &lt;script&gt;alert(&#39;QA_XSS&#39;)&lt;/script&gt;&lt;svg onload=alert(1)&gt;")
+      expect(cleanedTitle).not.toContain('<script>')
+      expect(cleanedTitle).not.toContain('</script>')
+      expect(cleanedTitle).not.toContain('<svg')
+      expect(cleanedTitle).not.toContain('<')
+      expect(cleanedTitle).not.toContain('>')
+      expect(cleanedTitle).not.toContain("'")
+
+      // Body payload: Description with <img src=x onerror=alert(2)> tags
+      const bodyPayload = "Description with <img src=x onerror=alert(2)> tags"
+      const cleanedBody = sanitizeText(bodyPayload)
+      expect(cleanedBody).toBe("Description with &lt;img src=x onerror=alert(2)&gt; tags")
+      expect(cleanedBody).not.toContain('<img')
+      expect(cleanedBody).not.toContain('<')
+      expect(cleanedBody).not.toContain('>')
+
+      // Combined case-insensitive / uppercase variants
+      const upperPayload = "Probe XSS <SCRIPT>alert('QA_XSS')</SCRIPT><SVG ONLOAD=alert(1)><IMG SRC=X ONERROR=alert(2)>"
+      const cleanedUpper = sanitizeText(upperPayload)
+      expect(cleanedUpper).toBe("Probe XSS &lt;SCRIPT&gt;alert(&#39;QA_XSS&#39;)&lt;/SCRIPT&gt;&lt;SVG ONLOAD=alert(1)&gt;&lt;IMG SRC=X ONERROR=alert(2)&gt;")
+      expect(cleanedUpper).not.toContain('<SCRIPT')
+      expect(cleanedUpper).not.toContain('<SVG')
+      expect(cleanedUpper).not.toContain('<IMG')
+    })
+
+    it('neutralizes combined multi-vector direct instruction probes <script>alert(\'INSTRUCT_XSS\')</script><svg onload=alert(\'SVG\')>', () => {
+      // Task t_0d13b6f6 primary vector
+      const combinedPayload = "<script>alert('INSTRUCT_XSS')</script><svg onload=alert('SVG')>"
+      const cleanedCombined = sanitizeText(combinedPayload)
+      expect(cleanedCombined).toBe("&lt;script&gt;alert(&#39;INSTRUCT_XSS&#39;)&lt;/script&gt;&lt;svg onload=alert(&#39;SVG&#39;)&gt;")
+      expect(cleanedCombined).not.toContain('<script>')
+      expect(cleanedCombined).not.toContain('</script>')
+      expect(cleanedCombined).not.toContain('<svg')
+      expect(cleanedCombined).not.toContain('<')
+      expect(cleanedCombined).not.toContain('>')
+      expect(cleanedCombined).not.toContain("'")
+
+      // Quoted attribute variant
+      const quotedVariant = '<script>alert("INSTRUCT_XSS")</script><svg onload="alert(\'SVG\')">'
+      const cleanedQuoted = sanitizeText(quotedVariant)
+      expect(cleanedQuoted).toBe('&lt;script&gt;alert(&quot;INSTRUCT_XSS&quot;)&lt;/script&gt;&lt;svg onload=&quot;alert(&#39;SVG&#39;)&quot;&gt;')
+      expect(cleanedQuoted).not.toContain('"')
+      expect(cleanedQuoted).not.toContain('<')
+      expect(cleanedQuoted).not.toContain('>')
+
+      // Case-variation variant
+      const caseVariant = '<SCRIPT>alert(\'INSTRUCT_XSS\')</SCRIPT><SVG ONLOAD=alert(\'SVG\')>'
+      const cleanedCase = sanitizeText(caseVariant)
+      expect(cleanedCase).toBe('&lt;SCRIPT&gt;alert(&#39;INSTRUCT_XSS&#39;)&lt;/SCRIPT&gt;&lt;SVG ONLOAD=alert(&#39;SVG&#39;)&gt;')
+      expect(cleanedCase).not.toContain('<')
+      expect(cleanedCase).not.toContain('>')
+    })
   })
 
   describe('Cryptographic Session Tokens & Offline Forgery Immunity', () => {
