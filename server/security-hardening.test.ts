@@ -110,6 +110,57 @@ describe('Security Hardening & Cyber Defense Verification', () => {
       expect(cleanedBreakout).toBe('&quot;&gt;&lt;svg/onload=alert(document.cookie)&gt;')
     })
 
+    it('neutralizes attribute breakout event handler injection vectors (onmouseover)', () => {
+      // Task t_c91019bb payload: " onmouseover="alert(1)
+      const mouseoverPayload = `" onmouseover="alert(1)`
+      const cleanedMouseover = sanitizeText(mouseoverPayload)
+      expect(cleanedMouseover).toBe('&quot; onmouseover=&quot;alert(1)')
+      expect(cleanedMouseover).not.toContain('"')
+      expect(cleanedMouseover).not.toContain("'")
+
+      // Single-quote variant
+      const singleQuotePayload = `' onmouseover='alert(1)`
+      const cleanedSingle = sanitizeText(singleQuotePayload)
+      expect(cleanedSingle).toBe('&#39; onmouseover=&#39;alert(1)')
+      expect(cleanedSingle).not.toContain("'")
+      expect(cleanedSingle).not.toContain('"')
+
+      // Completed attribute breakout variant: x" onmouseover="alert('XSS')" foo="
+      const completedBreakout = `x" onmouseover="alert('XSS')" foo="`
+      const cleanedCompleted = sanitizeText(completedBreakout)
+      expect(cleanedCompleted).toBe(`x&quot; onmouseover=&quot;alert(&#39;XSS&#39;)&quot; foo=&quot;`)
+      expect(cleanedCompleted).not.toContain('"')
+      expect(cleanedCompleted).not.toContain("'")
+    })
+
+    it('neutralizes single-quote attribute breakout event handler injection vectors (onclick)', () => {
+      // Task t_3d970905 payload: ' onclick='alert(1)
+      const onclickPayload = `' onclick='alert(1)`
+      const cleanedOnclick = sanitizeText(onclickPayload)
+      expect(cleanedOnclick).toBe('&#39; onclick=&#39;alert(1)')
+      expect(cleanedOnclick).not.toContain("'")
+      expect(cleanedOnclick).not.toContain('"')
+
+      // Double-quote inside single-quote variant: ' onclick="alert(1)"
+      const doubleInsideSingle = `' onclick="alert(1)"`
+      const cleanedDouble = sanitizeText(doubleInsideSingle)
+      expect(cleanedDouble).toBe('&#39; onclick=&quot;alert(1)&quot;')
+      expect(cleanedDouble).not.toContain("'")
+      expect(cleanedDouble).not.toContain('"')
+
+      // Unquoted variant: ' onclick=alert(1)//
+      const unquotedVariant = `' onclick=alert(1)//`
+      const cleanedUnquoted = sanitizeText(unquotedVariant)
+      expect(cleanedUnquoted).toBe('&#39; onclick=alert(1)//')
+      expect(cleanedUnquoted).not.toContain("'")
+
+      // Full breakout and closure: x' onclick='alert(1)' foo='
+      const fullBreakout = `x' onclick='alert(1)' foo='`
+      const cleanedFull = sanitizeText(fullBreakout)
+      expect(cleanedFull).toBe('x&#39; onclick=&#39;alert(1)&#39; foo=&#39;')
+      expect(cleanedFull).not.toContain("'")
+    })
+
     it('neutralizes iframe javascript protocol and srcdoc injection vectors', () => {
       const iframeJsPayload = `<iframe src="javascript:alert('IFRAME')"></iframe>`
       const cleanedIframeJs = sanitizeText(iframeJsPayload)
@@ -179,6 +230,31 @@ describe('Security Hardening & Cyber Defense Verification', () => {
       expect(cleanedNested).not.toContain('<details')
       expect(cleanedNested).not.toContain('</details>')
       expect(cleanedNested).not.toContain('<summary>')
+    })
+
+    it('neutralizes nested and malformed script tag vectors <<SCRIPT>alert("XSS");//<</SCRIPT>', () => {
+      const nestedPayload = '<<SCRIPT>alert("XSS");//<</SCRIPT>'
+      const cleanedNested = sanitizeText(nestedPayload)
+      expect(cleanedNested).toBe('&lt;&lt;SCRIPT&gt;alert(&quot;XSS&quot;);//&lt;&lt;/SCRIPT&gt;')
+      expect(cleanedNested).not.toContain('<')
+      expect(cleanedNested).not.toContain('>')
+      expect(cleanedNested).not.toContain('"')
+      expect(cleanedNested).not.toContain('<SCRIPT>')
+      expect(cleanedNested).not.toContain('</SCRIPT>')
+      expect(cleanedNested).toContain('&lt;&lt;SCRIPT&gt;')
+      expect(cleanedNested).toContain('&lt;&lt;/SCRIPT&gt;')
+
+      const lowerNested = '<<script>alert("XSS");//<</script>'
+      const cleanedLower = sanitizeText(lowerNested)
+      expect(cleanedLower).toBe('&lt;&lt;script&gt;alert(&quot;XSS&quot;);//&lt;&lt;/script&gt;')
+      expect(cleanedLower).not.toContain('<')
+      expect(cleanedLower).not.toContain('>')
+
+      const recursiveNested = '<scr<script>ipt>alert(1)</script>'
+      const cleanedRecursive = sanitizeText(recursiveNested)
+      expect(cleanedRecursive).toBe('&lt;scr&lt;script&gt;ipt&gt;alert(1)&lt;/script&gt;')
+      expect(cleanedRecursive).not.toContain('<')
+      expect(cleanedRecursive).not.toContain('>')
     })
   })
 

@@ -1,5 +1,6 @@
 import { execFile as execFileCallback } from 'node:child_process'
 import { promisify } from 'node:util'
+import { loadFederatedAgents } from './agent-federation.js'
 
 const execFile = promisify(execFileCallback)
 const CACHE_MS = 10_000
@@ -63,7 +64,7 @@ export interface AgentActivitySnapshot { agents: AgentActivity[]; fetchedAt: str
 export interface OfficeSnapshot { stations: OfficeStation[]; summary: OfficeSummary; fetchedAt: string }
 export interface OfficeSummary { declared: number; active: number; idle: number; offline: number; unknown: number; gatewaysReachable: number; gatewaysDeclared: number }
 export interface ExplicitOfficeState { station: OfficeStation['name']; state: 'Working' | 'Reviewing' | 'Collaborating'; expiresAt: string }
-export interface OfficeBuildOptions { now?: string | number; explicitStates?: ExplicitOfficeState[]; agentActivity?: AgentActivitySnapshot }
+export interface OfficeBuildOptions { now?: string | number; explicitStates?: ExplicitOfficeState[]; agentActivity?: AgentActivitySnapshot; federatedAgents?: Array<{ id: string; name: string; role: string }> }
 export interface UsageInsights {
   days: number
   sessions: number
@@ -821,10 +822,17 @@ export async function collectAgentActivity(profiles: readonly string[], run: Run
 /** One office station per agent: every Hermes profile, plus OpenCode when it is installed. */
 interface AgentSpec { id: string; role: string; profile?: string; gateway?: GatewayState; aliases: string[] }
 
-export function agentRoster(runtime: RuntimeSnapshot): AgentSpec[] {
+export function agentRoster(runtime: RuntimeSnapshot, federated?: Array<{ id: string; name: string; role?: string }>): AgentSpec[] {
   const profiles = runtime.profiles.availability === 'available' ? runtime.profiles.data : []
   const agents: AgentSpec[] = profiles.filter((profile) => PROFILE_NAME.test(profile.name)).map((profile) => ({ id: profile.name, role: 'Hermes profile', profile: profile.name, gateway: profile.gateway, aliases: [profile.name.toLowerCase()] }))
   if (runtime.openCode.availability === 'available' && !agents.some((agent) => agent.id === 'opencode')) agents.push({ id: 'opencode', role: 'OpenCode', aliases: ['opencode', 'open-code'] })
+  if (Array.isArray(federated)) {
+    for (const fed of federated) {
+      if (!agents.some((a) => a.id.toLowerCase() === fed.id.toLowerCase())) {
+        agents.push({ id: fed.name || fed.id, role: fed.role || 'Guest Agent', aliases: [fed.id.toLowerCase(), (fed.name || '').toLowerCase()] })
+      }
+    }
+  }
   return agents
 }
 
@@ -907,7 +915,7 @@ export function buildOfficeSnapshot(runtime: RuntimeSnapshot, board: TaskBoardSn
   const freshActivity = activity.sessions.availability === 'available' && isFresh(activity.fetchedAt, now)
   const agentActivity = options.agentActivity && isFresh(options.agentActivity.fetchedAt, now) ? options.agentActivity : undefined
   const explicitStates = options.explicitStates ?? []
-  const stations = agentRoster(runtime).map((agent, index): OfficeStation => {
+  const stations = agentRoster(runtime, options.federatedAgents).map((agent, index): OfficeStation => {
     const gateway = agent.gateway
     const task = freshBoard ? attributedTask(board.tasks.data, agent.aliases) : undefined
     const overlay = explicitState(agent, explicitStates, now)
@@ -1020,6 +1028,13 @@ export function getKnowledge(now = Date.now()): Promise<KnowledgeSnapshot> { ret
 export function getChannels(now = Date.now()): Promise<ChannelSnapshot> { return channelSource(now) }
 export function getLogs(now = Date.now()): Promise<LogsSnapshot> { return logsSource(now) }
 
+const taskDetailCache = new Map<string, { value: TaskDetailSnapshot; expires: number }>()
+const taskDetailInflight = new Map<string, Promise<TaskDetailSnapshot | undefined>>()
+
+export function clearTaskDetailCache(): void {
+  taskDetailCache.clear()
+}
+
 /** Detail for a task on the current board; returns undefined for ids Hermes did not list. */
 /** Details of a task on the current board snapshot; `board` picks the board it lives on. */
 export async function getTaskDetail(id: string, now = Date.now(), board?: string): Promise<TaskDetailSnapshot | undefined> {
@@ -1027,7 +1042,23 @@ export async function getTaskDetail(id: string, now = Date.now(), board?: string
   if (!TASK_ID.test(id) || !BOARD_SLUG.test(targetBoard)) return undefined
   const snapshot = await getTaskBoard(now)
   if (snapshot.tasks.availability === 'available' && !snapshot.tasks.data.some((task) => task.id === id && (task.board ?? 'default') === targetBoard)) return undefined
-  return collectTaskDetail(id, systemRun, board)
+  const cacheKey = `${targetBoard}:${id}`
+  const cached = taskDetailCache.get(cacheKey)
+  if (cached && cached.expires > now) {
+    return cached.value
+  }
+  const inflight = taskDetailInflight.get(cacheKey)
+  if (inflight) return inflight
+
+  const promise = collectTaskDetail(id, systemRun, board).then((detail) => {
+    taskDetailCache.set(cacheKey, { value: detail, expires: Date.now() + 5_000 })
+    return detail
+  }).finally(() => {
+    taskDetailInflight.delete(cacheKey)
+  })
+
+  taskDetailInflight.set(cacheKey, promise)
+  return promise
 }
 
 export async function getOffice(now = Date.now()): Promise<OfficeSnapshot> {
