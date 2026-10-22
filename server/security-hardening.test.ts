@@ -97,6 +97,28 @@ describe('Security Hardening & Cyber Defense Verification', () => {
       expect(cleanedCase).not.toContain('<IFRAME')
     })
 
+    it('neutralizes anchor javascript protocol and link injection vectors', () => {
+      const anchorPayload = `<a href="javascript:alert('LINK')">Click</a>`
+      const cleanedAnchor = sanitizeText(anchorPayload)
+      expect(cleanedAnchor).toBe('&lt;a href=&quot;javascript:alert(&#39;LINK&#39;)&quot;&gt;Click&lt;/a&gt;')
+      expect(cleanedAnchor).not.toContain('<a')
+      expect(cleanedAnchor).not.toContain('</a>')
+      expect(cleanedAnchor).not.toContain('<')
+      expect(cleanedAnchor).not.toContain('>')
+
+      const upperCasePayload = `<A HREF="JAVASCRIPT:alert('UPPER')">CLICK</A>`
+      const cleanedUpper = sanitizeText(upperCasePayload)
+      expect(cleanedUpper).toBe('&lt;A HREF=&quot;JAVASCRIPT:alert(&#39;UPPER&#39;)&quot;&gt;CLICK&lt;/A&gt;')
+      expect(cleanedUpper).not.toContain('<A')
+      expect(cleanedUpper).not.toContain('</A>')
+
+      const unquotedPayload = `<a href=javascript:alert('UNQUOTED')>Click</a>`
+      const cleanedUnquoted = sanitizeText(unquotedPayload)
+      expect(cleanedUnquoted).toBe('&lt;a href=javascript:alert(&#39;UNQUOTED&#39;)&gt;Click&lt;/a&gt;')
+      expect(cleanedUnquoted).not.toContain('<a')
+      expect(cleanedUnquoted).not.toContain('</a>')
+    })
+
     it('neutralizes polyglot XSS vectors targeting multiple element contexts', () => {
       const polyglotPayload = "javascript:/*--></title></style></textarea></noscript>--><script>alert('POLYGLOT')</script>"
       const cleanedPolyglot = sanitizeText(polyglotPayload)
@@ -109,6 +131,22 @@ describe('Security Hardening & Cyber Defense Verification', () => {
       expect(cleanedPolyglot).not.toContain('</script>')
       expect(cleanedPolyglot).not.toContain('>')
       expect(cleanedPolyglot).not.toContain('<')
+    })
+    it('neutralizes details ontoggle and HTML5 collapsible event vectors', () => {
+      const detailsPayload = "<details open ontoggle=alert('DETAILS')>"
+      const cleanedDetails = sanitizeText(detailsPayload)
+      expect(cleanedDetails).toBe("&lt;details open ontoggle=alert(&#39;DETAILS&#39;)&gt;")
+      expect(cleanedDetails).not.toContain('<details')
+      expect(cleanedDetails).not.toContain('<')
+      expect(cleanedDetails).not.toContain('>')
+      expect(cleanedDetails).toContain('&lt;details open ontoggle=alert(&#39;DETAILS&#39;)&gt;')
+
+      const detailsNested = "<details open ontoggle=\"alert(document.cookie)\"><summary>Click</summary></details>"
+      const cleanedNested = sanitizeText(detailsNested)
+      expect(cleanedNested).toBe("&lt;details open ontoggle=&quot;alert(document.cookie)&quot;&gt;&lt;summary&gt;Click&lt;/summary&gt;&lt;/details&gt;")
+      expect(cleanedNested).not.toContain('<details')
+      expect(cleanedNested).not.toContain('</details>')
+      expect(cleanedNested).not.toContain('<summary>')
     })
   })
 
