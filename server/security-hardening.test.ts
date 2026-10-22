@@ -96,6 +96,20 @@ describe('Security Hardening & Cyber Defense Verification', () => {
       expect(cleanedCase).toBe('&lt;IFRAME SRC=&quot;javascript:alert(&#39;XSS&#39;)&quot;&gt;&lt;/IFRAME&gt;')
       expect(cleanedCase).not.toContain('<IFRAME')
     })
+
+    it('neutralizes polyglot XSS vectors targeting multiple element contexts', () => {
+      const polyglotPayload = "javascript:/*--></title></style></textarea></noscript>--><script>alert('POLYGLOT')</script>"
+      const cleanedPolyglot = sanitizeText(polyglotPayload)
+      expect(cleanedPolyglot).toBe("javascript:/*--&gt;&lt;/title&gt;&lt;/style&gt;&lt;/textarea&gt;&lt;/noscript&gt;--&gt;&lt;script&gt;alert(&#39;POLYGLOT&#39;)&lt;/script&gt;")
+      expect(cleanedPolyglot).not.toContain('</title>')
+      expect(cleanedPolyglot).not.toContain('</style>')
+      expect(cleanedPolyglot).not.toContain('</textarea>')
+      expect(cleanedPolyglot).not.toContain('</noscript>')
+      expect(cleanedPolyglot).not.toContain('<script>')
+      expect(cleanedPolyglot).not.toContain('</script>')
+      expect(cleanedPolyglot).not.toContain('>')
+      expect(cleanedPolyglot).not.toContain('<')
+    })
   })
 
   describe('Cryptographic Session Tokens & Offline Forgery Immunity', () => {
