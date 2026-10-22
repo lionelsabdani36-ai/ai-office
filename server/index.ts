@@ -22,6 +22,7 @@ const PORT = Number(process.env.RUANG_PORT ?? process.env.MISSION_CONTROL_PORT) 
 const distDirectory = [new URL('../dist', import.meta.url), new URL('../../dist', import.meta.url)].map((url) => fileURLToPath(url)).find((path) => existsSync(join(path, 'index.html'))) ?? fileURLToPath(new URL('../dist', import.meta.url))
 
 const app = express()
+app.set('trust proxy', 1)
 app.disable('x-powered-by')
 app.use(express.json({ limit: '2mb' }))
 app.use(express.urlencoded({ extended: true }))

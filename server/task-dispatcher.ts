@@ -101,8 +101,8 @@ export function installTaskDispatcher(app: Express): void {
         return
       }
 
-      const cleanTitle = sanitizeText(title)
-      const cleanDesc = sanitizeText(description)
+      const cleanTitle = sanitizeText(title).substring(0, 200)
+      const cleanDesc = sanitizeText(description).substring(0, 4000)
       const cleanAssignee = sanitizeText(assignee).toLowerCase()
       const cleanPriority = ['normal', 'high', 'urgent'].includes(priority) ? priority : 'normal'
 
@@ -116,7 +116,7 @@ export function installTaskDispatcher(app: Express): void {
       let kanbanTaskId: string | undefined
 
       if (isInternal) {
-        // Dispatch to internal Hermes Kanban using safe execFile without shell interpolation
+        // Dispatch to internal Hermes Kanban using safe execFile with option terminator (--)
         try {
           const { stdout } = await execFileAsync('hermes', [
             'kanban',
@@ -125,6 +125,7 @@ export function installTaskDispatcher(app: Express): void {
             cleanAssignee,
             '--body',
             `${cleanDesc} (Requested via Web by ${session.name || session.email})`,
+            '--',
             cleanTitle,
           ], { timeout: 15000 })
 
@@ -210,7 +211,7 @@ export function installTaskDispatcher(app: Express): void {
       list.unshift(entry)
       await saveInstructions(list)
 
-      // If internal, also register as priority Kanban task
+      // If internal, also register as priority Kanban task with safe parameter separation
       if (INTERNAL_AGENTS.includes(cleanAgent)) {
         try {
           await execFileAsync('hermes', [
@@ -220,6 +221,7 @@ export function installTaskDispatcher(app: Express): void {
             cleanAgent,
             '--body',
             cleanInstruction,
+            '--',
             `[Direct Web Instruction] ${cleanInstruction.substring(0, 45)}...`,
           ], { timeout: 15000 })
         } catch {
@@ -238,17 +240,39 @@ export function installTaskDispatcher(app: Express): void {
     }
   })
 
-  // 3. Get Dispatched Tasks History
-  app.get('/api/company/tasks/history', async (_req: Request, res: Response) => {
+  // 3. Get Dispatched Tasks History (Redacts creator email/name if unauthenticated)
+  app.get('/api/company/tasks/history', async (req: Request, res: Response) => {
+    const authHeader = req.headers.authorization || ''
+    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
+    const session = verifySessionToken(token)
+
     const tasks = await loadDispatchedTasks()
+    const safeTasks = tasks.slice(0, 50).map((t) => {
+      if (session && session.email) return t
+      return {
+        ...t,
+        creatorEmail: undefined,
+        creatorName: 'Verified Member',
+      }
+    })
+
     res.json({
       total: tasks.length,
-      tasks: tasks.slice(0, 50),
+      tasks: safeTasks,
     })
   })
 
-  // 4. Get Instructions History
-  app.get('/api/company/instructions/history', async (_req: Request, res: Response) => {
+  // 4. Get Instructions History (Requires valid session token)
+  app.get('/api/company/instructions/history', async (req: Request, res: Response) => {
+    const authHeader = req.headers.authorization || ''
+    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
+    const session = verifySessionToken(token)
+
+    if (!session || !session.email) {
+      res.status(401).json({ error: 'Authentication required to access instruction logs.' })
+      return
+    }
+
     const list = await loadInstructions()
     res.json({
       total: list.length,

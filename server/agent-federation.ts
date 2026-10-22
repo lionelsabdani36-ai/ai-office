@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import { promises as fsp } from 'node:fs'
 import type { Request, Response, Express } from 'express'
-import { generateSecureKey, sanitizeText, isSafeIdentifier, verifySessionToken } from './security.js'
+import { generateSecureKey, sanitizeText, isSafeIdentifier, verifySessionToken, isSafeWebhookUrl, safeCompare } from './security.js'
 
 const DATA_DIR = join(process.cwd(), 'data')
 const FEDERATED_AGENTS_FILE = join(DATA_DIR, 'federated_agents.json')
@@ -139,8 +139,8 @@ export async function dispatchTaskToFederatedAgent(agentIdentifier: string, task
   queuedTasks.push(queueEntry)
   await saveAgentTasks(queuedTasks)
 
-  // If agent has configured webhook URL, fire notification asynchronously
-  if (agent.endpointUrl && agent.endpointUrl.startsWith('http')) {
+  // If agent has configured webhook URL, fire notification asynchronously (with SSRF protection)
+  if (agent.endpointUrl && isSafeWebhookUrl(agent.endpointUrl)) {
     fetch(agent.endpointUrl, {
       method: 'POST',
       headers: {
@@ -172,15 +172,17 @@ export function installAgentFederation(app: Express): void {
       }
 
       const { label = 'Friend Agent Invite', maxUses = 1, daysValid = 7 } = req.body || {}
+      const safeMaxUses = Math.min(20, Math.max(1, Number(maxUses) || 1))
+      const safeDaysValid = Math.min(30, Math.max(1, Number(daysValid) || 1))
       const inviteKey = `dck_inv_${generateSecureKey(16)}`
-      const expiresAt = new Date(Date.now() + daysValid * 86400_000).toISOString()
+      const expiresAt = new Date(Date.now() + safeDaysValid * 86400_000).toISOString()
 
       const newInvite: AgentInvite = {
         key: inviteKey,
         creatorEmail: String(session.email),
         label: sanitizeText(label),
-        maxUses: Math.max(1, Number(maxUses) || 1),
-        usesLeft: Math.max(1, Number(maxUses) || 1),
+        maxUses: safeMaxUses,
+        usesLeft: safeMaxUses,
         expiresAt,
         createdAt: new Date().toISOString(),
       }
@@ -213,9 +215,15 @@ export function installAgentFederation(app: Express): void {
     }
 
     const invites = await loadInvites()
+    const now = Date.now()
+    const activeInvites = invites.filter((inv) => new Date(inv.expiresAt).getTime() > now && inv.usesLeft > 0)
+    const filteredInvites = session.role === 'admin'
+      ? activeInvites
+      : activeInvites.filter((inv) => inv.creatorEmail === session.email)
+
     res.json({
-      total: invites.length,
-      invites: invites.filter((inv) => new Date(inv.expiresAt).getTime() > Date.now()),
+      total: filteredInvites.length,
+      invites: filteredInvites,
     })
   })
 
@@ -245,6 +253,11 @@ export function installAgentFederation(app: Express): void {
 
       if (!isSafeIdentifier(cleanName)) {
         res.status(400).json({ error: 'Agent name must be alphanumeric.' })
+        return
+      }
+
+      if (cleanEndpoint && !isSafeWebhookUrl(cleanEndpoint)) {
+        res.status(400).json({ error: 'Invalid or forbidden webhook URL. Localhost and private network targets are blocked.' })
         return
       }
 
@@ -351,7 +364,7 @@ export function installAgentFederation(app: Express): void {
     const agents = await loadFederatedAgents()
     const agent = agents.find((a) => a.id === agentId)
 
-    if (!agent || agent.apiKey !== authKey) {
+    if (!agent || !safeCompare(agent.apiKey, String(authKey))) {
       res.status(401).json({ error: 'Invalid agent credentials.' })
       return
     }
@@ -376,7 +389,7 @@ export function installAgentFederation(app: Express): void {
     const agents = await loadFederatedAgents()
     const agent = agents.find((a) => a.id === agentId)
 
-    if (!agent || agent.apiKey !== authKey) {
+    if (!agent || !safeCompare(agent.apiKey, String(authKey))) {
       res.status(401).json({ error: 'Invalid agent credentials.' })
       return
     }

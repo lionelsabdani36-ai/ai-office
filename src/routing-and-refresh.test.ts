@@ -7,6 +7,12 @@ describe('hash routing', () => {
   it('round-trips every page and falls back to the Office home', () => {
     for (const page of navigation) expect(pageFromHash(`#/${pageSlug(page)}`)).toBe(page)
     expect(pageFromHash('#/task-board')).toBe('Task Board')
+    expect(pageFromHash('#/dispatch-team')).toBe('Dispatch & Team')
+    expect(pageFromHash('#/dispatch-&-team')).toBe('Dispatch & Team')
+    expect(pageFromHash('/dispatch-team')).toBe('Dispatch & Team')
+    expect(pageFromHash('#/dispatch')).toBe('Dispatch & Team')
+    expect(pageFromHash('#/team')).toBe('Dispatch & Team')
+    expect(pageSlug('Dispatch & Team')).toBe('dispatch-team')
     expect(pageFromHash('#dashboard')).toBe('Office')
     expect(pageFromHash('')).toBe('Office')
     expect(pageFromHash('#/nope')).toBe('Office')

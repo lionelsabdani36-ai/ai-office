@@ -21,7 +21,16 @@ import { HOME, navigation, pageFromHash, pageSlug, type Page } from './routes.ts
 import type { DashboardSnapshot } from './types.ts'
 
 function currentPage(): Page {
-  return typeof window === 'undefined' ? HOME : pageFromHash(window.location.hash)
+  if (typeof window === 'undefined') return HOME
+  const hash = window.location.hash
+  if (hash && hash !== '#' && hash !== '#/') {
+    return pageFromHash(hash)
+  }
+  const path = window.location.pathname
+  if (path && path !== '/') {
+    return pageFromHash(path)
+  }
+  return HOME
 }
 
 function Shell({ onRefresh, access, onAccessChange }: { onRefresh: () => void; access: AccessStatus | undefined; onAccessChange: (status: AccessStatus) => void }) {
@@ -40,9 +49,13 @@ function Shell({ onRefresh, access, onAccessChange }: { onRefresh: () => void; a
       : 'This page is older than the Ruang server. Reload the page (and run npm run build if you use npm start).'
 
   useEffect(() => {
-    const onHashChange = () => setPage(currentPage())
-    window.addEventListener('hashchange', onHashChange)
-    return () => window.removeEventListener('hashchange', onHashChange)
+    const onLocationChange = () => setPage(currentPage())
+    window.addEventListener('hashchange', onLocationChange)
+    window.addEventListener('popstate', onLocationChange)
+    return () => {
+      window.removeEventListener('hashchange', onLocationChange)
+      window.removeEventListener('popstate', onLocationChange)
+    }
   }, [])
   useEffect(() => { document.title = `${page} · Ruang` }, [page])
   useEffect(() => {

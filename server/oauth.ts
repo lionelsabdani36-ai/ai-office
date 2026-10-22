@@ -129,15 +129,21 @@ export function installOAuth(app: Express): void {
       const users = await loadUsers()
       let user = users.find((u) => u.email.toLowerCase() === userEmail.toLowerCase())
 
+      // Guard: Admin accounts cannot be accessed via unverified quick login
+      if (user && user.role === 'admin' && !credential) {
+        res.status(403).json({ error: 'Administrative accounts require verified Google OAuth credentials to sign in.' })
+        return
+      }
+
       if (!user) {
-        // Register new user
+        // Register new user (quick/mock login cannot grant admin role)
         user = {
           id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
           name: userName || userEmail.split('@')[0],
           email: userEmail.toLowerCase(),
           provider: 'google',
           avatarUrl: userAvatar,
-          role: users.length === 0 ? 'admin' : 'member', // First user is admin
+          role: 'member',
           createdAt: new Date().toISOString(),
           lastLogin: new Date().toISOString(),
         }
@@ -230,6 +236,12 @@ export function installOAuth(app: Express): void {
       const users = await loadUsers()
       let user = users.find((u) => u.email.toLowerCase() === userEmail.toLowerCase())
 
+      // Guard: Admin accounts cannot be accessed via unverified quick login
+      if (user && user.role === 'admin' && !code) {
+        res.status(403).json({ error: 'Administrative accounts require verified GitHub OAuth credentials to sign in.' })
+        return
+      }
+
       if (!user) {
         user = {
           id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -237,7 +249,7 @@ export function installOAuth(app: Express): void {
           email: userEmail.toLowerCase(),
           provider: 'github',
           avatarUrl: userAvatar,
-          role: users.length === 0 ? 'admin' : 'member',
+          role: 'member',
           createdAt: new Date().toISOString(),
           lastLogin: new Date().toISOString(),
         }

@@ -1,8 +1,30 @@
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs'
+import { join } from 'node:path'
 import type { Request, Response, NextFunction } from 'express'
 
-// Secret key for HMAC signing (derived from env or generated per process)
-const HMAC_SECRET = process.env.COMPANY_SECURITY_SECRET || process.env.RUANG_SECRET || 'duckvaulta-super-secure-company-secret-2026'
+// Dynamic cryptographic secret for HMAC signing (derived from env or securely generated on disk)
+function resolveHmacSecret(): string {
+  if (process.env.COMPANY_SECURITY_SECRET) return process.env.COMPANY_SECURITY_SECRET
+  if (process.env.RUANG_SECRET) return process.env.RUANG_SECRET
+
+  const secretDir = join(process.cwd(), 'data')
+  const secretPath = join(secretDir, '.company_hmac_secret')
+  try {
+    if (existsSync(secretPath)) {
+      const secret = readFileSync(secretPath, 'utf8').trim()
+      if (secret.length >= 32) return secret
+    }
+    const generated = randomBytes(48).toString('hex')
+    mkdirSync(secretDir, { recursive: true })
+    writeFileSync(secretPath, generated, { mode: 0o600 })
+    return generated
+  } catch {
+    return randomBytes(48).toString('hex')
+  }
+}
+
+const HMAC_SECRET = resolveHmacSecret()
 
 // In-memory sliding window rate limiter
 interface RateLimitBucket {
@@ -117,4 +139,40 @@ export function verifySessionToken(token: string): Record<string, unknown> | nul
  */
 export function generateSecureKey(bytes = 32): string {
   return randomBytes(bytes).toString('hex')
+}
+
+/**
+ * SSRF validation: Disallows loopback, private ranges, link-local, and non-http(s) protocols
+ */
+export function isSafeWebhookUrl(urlStr: string): boolean {
+  if (!urlStr || typeof urlStr !== 'string') return false
+  try {
+    const parsed = new URL(urlStr)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
+
+    const rawHost = parsed.hostname.toLowerCase()
+    const hostname = rawHost.replace(/^\[|\]$/g, '')
+
+    // Disallow localhost and loopbacks
+    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '0.0.0.0' || hostname === '::') {
+      return false
+    }
+
+    // Disallow link-local / cloud metadata (169.254.x.x)
+    if (hostname.startsWith('169.254.')) return false
+
+    // Disallow private RFC1918 IPv4
+    if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return false
+    if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) return false
+    if (/^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(hostname)) return false
+
+    // Disallow common internal TLDs
+    if (hostname.endsWith('.internal') || hostname.endsWith('.local') || hostname.endsWith('.lan')) {
+      return false
+    }
+
+    return true
+  } catch {
+    return false
+  }
 }
