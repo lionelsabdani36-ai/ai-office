@@ -9,6 +9,10 @@ import { installProfileLock, isHidden, type Privacy } from './profile-lock.js'
 import { API_VERSION } from './api-version.js'
 import { collectMemory } from './memory.js'
 import { getActivity, getCalendar, getChannels, getCommandLog, getDashboard, getKnowledge, getLogs, getOffice, getSnapshot, getTaskBoard, getTaskDetail, getUsage } from './mission-control.js'
+import { rateLimiter } from './security.js'
+import { installOAuth } from './oauth.js'
+import { installTaskDispatcher } from './task-dispatcher.js'
+import { installAgentFederation } from './agent-federation.js'
 
 const HOST = '127.0.0.1'
 // MISSION_CONTROL_PORT is the pre-rename name, still honoured.
@@ -19,6 +23,10 @@ const distDirectory = [new URL('../dist', import.meta.url), new URL('../../dist'
 
 const app = express()
 app.disable('x-powered-by')
+app.use(express.json({ limit: '2mb' }))
+app.use(express.urlencoded({ extended: true }))
+app.use('/api', rateLimiter(120, 60_000))
+
 app.use('/api', (_request, response, next) => {
   response.set('Cache-Control', 'no-store')
   next()
@@ -26,6 +34,11 @@ app.use('/api', (_request, response, next) => {
 
 const startedAt = new Date().toISOString()
 app.get('/api/health', (_request, response) => { response.json({ ok: true, apiVersion: API_VERSION, startedAt }) })
+
+// Install OAuth, Task Dispatcher, & Agent Federation systems
+installOAuth(app)
+installTaskDispatcher(app)
+installAgentFederation(app)
 
 // Optional access code (off by default): locks every other /api route until it is entered.
 installAccess(app)
