@@ -40,6 +40,8 @@ const ipBuckets = new Map<string, RateLimitBucket>()
 export function rateLimiter(maxRequests = 60, windowMs = 60_000) {
   return (req: Request, res: Response, next: NextFunction): void => {
     const ip = req.ip || req.socket.remoteAddress || '127.0.0.1'
+    const isLoopback = ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1'
+    const effectiveLimit = isLoopback ? Math.max(maxRequests * 10, 1000) : maxRequests
     const now = Date.now()
 
     const bucket = ipBuckets.get(ip)
@@ -48,7 +50,7 @@ export function rateLimiter(maxRequests = 60, windowMs = 60_000) {
       return next()
     }
 
-    if (bucket.count >= maxRequests) {
+    if (bucket.count >= effectiveLimit) {
       res.status(429).json({
         error: 'Too many requests. Rate limit exceeded, please wait a moment.',
         retryAfterMs: bucket.resetTime - now,

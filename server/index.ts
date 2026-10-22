@@ -74,8 +74,9 @@ app.get('/api/usage', async (request, response) => {
 })
 app.get('/api/tasks/:id', async (request, response) => {
   const board = typeof request.query.board === 'string' && request.query.board ? request.query.board : undefined
+  const targetBoard = board ?? 'default'
   const privacy = await privacyOf(request)
-  const listed = (await getTaskBoard()).tasks.data.find((task) => task.id === request.params.id && task.board === board)
+  const listed = (await getTaskBoard()).tasks.data.find((task) => task.id === request.params.id && (task.board ?? 'default') === targetBoard)
   if (listed && isHidden(privacy, listed.assignee)) { locked(response, listed.assignee!); return }
   const detail = await getTaskDetail(String(request.params.id), Date.now(), board)
   if (!detail) { response.status(404).json({ error: 'Unknown task.' }); return }

@@ -1023,9 +1023,10 @@ export function getLogs(now = Date.now()): Promise<LogsSnapshot> { return logsSo
 /** Detail for a task on the current board; returns undefined for ids Hermes did not list. */
 /** Details of a task on the current board snapshot; `board` picks the board it lives on. */
 export async function getTaskDetail(id: string, now = Date.now(), board?: string): Promise<TaskDetailSnapshot | undefined> {
-  if (!TASK_ID.test(id) || (board !== undefined && !BOARD_SLUG.test(board))) return undefined
+  const targetBoard = board ?? 'default'
+  if (!TASK_ID.test(id) || !BOARD_SLUG.test(targetBoard)) return undefined
   const snapshot = await getTaskBoard(now)
-  if (snapshot.tasks.availability === 'available' && !snapshot.tasks.data.some((task) => task.id === id && task.board === board)) return undefined
+  if (snapshot.tasks.availability === 'available' && !snapshot.tasks.data.some((task) => task.id === id && (task.board ?? 'default') === targetBoard)) return undefined
   return collectTaskDetail(id, systemRun, board)
 }
 
