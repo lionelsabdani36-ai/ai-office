@@ -28,6 +28,14 @@ describe('Security Hardening & Cyber Defense Verification', () => {
       expect(isSafeWebhookUrl('http://router.lan/admin')).toBe(false)
     })
 
+    it('blocks IPv6-mapped IPv4 bypass vectors and IPv6 local/private subnets', () => {
+      expect(isSafeWebhookUrl('http://[::ffff:127.0.0.1]:8080/')).toBe(false)
+      expect(isSafeWebhookUrl('http://[::ffff:7f00:1]:8080/')).toBe(false)
+      expect(isSafeWebhookUrl('http://[::ffff:10.0.0.1]:8080/')).toBe(false)
+      expect(isSafeWebhookUrl('http://[fe80::1]:8080/')).toBe(false)
+      expect(isSafeWebhookUrl('http://[fd00::1]:8080/')).toBe(false)
+    })
+
     it('allows valid public external HTTPS endpoints', () => {
       expect(isSafeWebhookUrl('https://webhook.kawan-agent.io/duckvaulta-receiver')).toBe(true)
       expect(isSafeWebhookUrl('https://api.external-agent.com/v1/task')).toBe(true)

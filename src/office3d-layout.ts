@@ -197,7 +197,7 @@ export function createLayout(agentCount: number): OfficeLayout {
     sideLaneX: -10.15 + shift,
     gangCenterX: -11.4 + shift,
     camera: { target: [(sceneMinX + sceneMaxX) / 2 - 0.15, 0.6, 0.2], offset: CAMERA_OFFSET_BASE.map((value) => value * scale) as Vec3 },
-    pan: { minX: sceneMinX - 0.3, maxX: 29, minZ: -7, maxZ: 11 },
+    pan: { minX: sceneMinX - 0.3, maxX: 29.5, minZ: -7, maxZ: 11 },
     idleStops: idleStops(building, baksoCart, kopiBike, beds),
     meetingRoom: meetingRoom(building, deskCount),
   }

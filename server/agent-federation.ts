@@ -8,6 +8,19 @@ const FEDERATED_AGENTS_FILE = join(DATA_DIR, 'federated_agents.json')
 const INVITES_FILE = join(DATA_DIR, 'agent_invites.json')
 const AGENT_TASKS_FILE = join(DATA_DIR, 'agent_tasks_queue.json')
 
+const RESERVED_AGENT_NAMES = [
+  'leader',
+  'trend-hunter',
+  'fullstack-dev',
+  'qa-engineer',
+  'security-engineer',
+  'admin',
+  'administrator',
+  'system',
+  'root',
+  'opencode',
+]
+
 export interface FederatedAgent {
   id: string
   name: string
@@ -256,6 +269,12 @@ export function installAgentFederation(app: Express): void {
         return
       }
 
+      const normalizedName = cleanName.toLowerCase().replace(/[\s_\-]+/g, '-')
+      if (RESERVED_AGENT_NAMES.includes(normalizedName)) {
+        res.status(400).json({ error: 'Reserved identifier. Guest agents cannot use internal agent names.' })
+        return
+      }
+
       if (cleanEndpoint && !isSafeWebhookUrl(cleanEndpoint)) {
         res.status(400).json({ error: 'Invalid or forbidden webhook URL. Localhost and private network targets are blocked.' })
         return
@@ -328,12 +347,12 @@ export function installAgentFederation(app: Express): void {
     const federated = await loadFederatedAgents()
 
     const internalCrew = [
-      { id: 'leader', name: 'Leader', role: 'Orchestrator & Chief Agent', type: 'internal', status: 'online', color: '#00d2ff' },
-      { id: 'trend-hunter', name: 'Trend Hunter', role: 'Market Intelligence & Research', type: 'internal', status: 'online', color: '#10b981' },
-      { id: 'fullstack-dev', name: 'Fullstack Dev', role: 'Software & Web Engineering', type: 'internal', status: 'online', color: '#38bdf8' },
-      { id: 'qa-engineer', name: 'QA Engineer', role: 'Quality & Ergonomics Assurance', type: 'internal', status: 'online', color: '#f59e0b' },
-      { id: 'security-engineer', name: 'Security Engineer', role: 'Cyber Defense & Vulnerability Guard', type: 'internal', status: 'online', color: '#ef4444' },
-      { id: 'guru-tka', name: 'Guru TKA', role: 'Master Academic Mentor & TKA Pedagogy', type: 'internal', status: 'online', color: '#a855f7' },
+      { id: 'leader', name: 'David (Leader)', role: 'Orchestrator & Chief Agent', type: 'internal', status: 'online', color: '#00d2ff' },
+      { id: 'trend-hunter', name: 'Charlie (Trend Hunter)', role: 'Market Intelligence, Syllabus & Recon', type: 'internal', status: 'online', color: '#10b981' },
+      { id: 'fullstack-dev', name: 'Alex (Fullstack Dev)', role: 'Software, Web & CTF Solver Engineering', type: 'internal', status: 'online', color: '#38bdf8' },
+      { id: 'qa-engineer', name: 'Julius (QA Engineer)', role: 'Quality, UX & Anti-Slop Assurance', type: 'internal', status: 'online', color: '#f59e0b' },
+      { id: 'security-engineer', name: 'Athena (Security Engineer)', role: 'Cyber Defense & Exploit Analysis', type: 'internal', status: 'online', color: '#ef4444' },
+      { id: 'guru', name: 'Judith (Guru)', role: 'Master Educator & LKS Competition Mentor', type: 'internal', status: 'online', color: '#a855f7' },
     ]
 
     const federatedCrew = federated.map((agt) => ({

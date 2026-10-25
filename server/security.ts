@@ -156,7 +156,30 @@ export function isSafeWebhookUrl(urlStr: string): boolean {
     const hostname = rawHost.replace(/^\[|\]$/g, '')
 
     // Disallow localhost and loopbacks
-    if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '0.0.0.0' || hostname === '::') {
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1' ||
+      hostname === '0.0.0.0' ||
+      hostname === '::' ||
+      hostname === '0:0:0:0:0:0:0:1' ||
+      hostname === '0:0:0:0:0:0:0:0'
+    ) {
+      return false
+    }
+
+    // Disallow IPv6-mapped IPv4 addresses (::ffff:x.x.x.x or ::ffff:hex:hex)
+    if (hostname.startsWith('::ffff:') || hostname.startsWith('0:0:0:0:0:ffff:')) {
+      return false
+    }
+
+    // Disallow IPv6 unique local addresses (fc00::/7 -> fc00 to fdff)
+    if (/^f[cd][0-9a-f]{2}:/i.test(hostname) || hostname.startsWith('fc') || hostname.startsWith('fd')) {
+      return false
+    }
+
+    // Disallow IPv6 link-local addresses (fe80::/10 -> fe80 to febf)
+    if (/^fe[89ab][0-9a-f]:/i.test(hostname) || hostname.startsWith('fe80:')) {
       return false
     }
 
