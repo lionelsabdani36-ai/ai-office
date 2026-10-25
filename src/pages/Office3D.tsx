@@ -4,7 +4,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { officeStateBadge } from '../office-state.ts'
 import { agentLook } from '../agents.ts'
-import { clampTarget, createLayout, FLOOR_HEIGHT, floorOf, GAME_ROOM, idlePlan, placementFor, walkPath3, type Floor, type OfficeLayout, type Placement, type Vec3 } from '../office3d-layout.ts'
+import { clampTarget, createLayout, FLOOR_HEIGHT, floorOf, GAME_ROOM, GUEST_BUILDING, idlePlan, placementFor, walkPath3, type Floor, type OfficeLayout, type Placement, type Vec3 } from '../office3d-layout.ts'
 import { Environment } from '../scene3d/environment.tsx'
 import { RBox, WorkDesk } from '../scene3d/props.tsx'
 import type { OfficeStation } from '../types.ts'
@@ -18,7 +18,8 @@ type Registry<T> = MutableRefObject<Map<string, T>>
 function outdoors(x: number, z: number, layout: OfficeLayout): boolean {
   const { minX, maxX, maxZ } = layout.building
   const inGameRoom = x > GAME_ROOM.minX && x < GAME_ROOM.maxX && z > GAME_ROOM.minZ && z < GAME_ROOM.maxZ
-  return x < minX || z > maxZ || (x > maxX && !inGameRoom)
+  const inGuestBuilding = x > GUEST_BUILDING.minX && x < GUEST_BUILDING.maxX && z > GUEST_BUILDING.minZ && z < GUEST_BUILDING.maxZ
+  return x < minX || z > maxZ || (x > maxX && !inGameRoom && !inGuestBuilding)
 }
 
 function Character({ station, placement, layout, floor, onSelect, anchor }: { station: OfficeStation; placement: Placement; layout: OfficeLayout; floor: Floor; onSelect: (station: OfficeStation, trigger: HTMLElement | null) => void; anchor: (object: THREE.Object3D | null) => void }) {

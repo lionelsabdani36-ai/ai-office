@@ -33,6 +33,19 @@ export const GAME_TV: Vec3 = [14.2, 0, -5.05]
 export const BEANBAGS: Vec3[] = [[13.7, 0, -4.35], [14.7, 0, -4.35]]
 export const CARROM: Vec3 = [10.6, 0, -0.1]
 
+/** Dedicated Guest Agent Pavilion (Standalone building on the right grounds). */
+export const GUEST_BUILDING = { minX: 18.0, maxX: 26.5, minZ: -5.2, maxZ: 1.5 }
+export const GUEST_DOOR = { fromX: 21.0, toX: 23.5 }
+export const GUEST_DESKS: Vec3[] = [
+  [19.6, 0, -3.8],
+  [22.2, 0, -3.8],
+  [24.8, 0, -3.8],
+  [19.6, 0, -1.8],
+  [22.2, 0, -1.8],
+  [24.8, 0, -1.8],
+]
+export const GUEST_LOUNGE_SOFA: Vec3 = [22.2, 0, 0.4]
+
 /** Walkway in front of the desks; agents walk along it between areas instead of through furniture. */
 export const AISLE_Z = 0.4
 /** The meeting room's right wall (glass), its door in the aisle-side wall, and its table line. */
@@ -87,7 +100,7 @@ const DESK_ROWS_Z = [-3.5, -1]
 const MIN_DESK_COLUMNS = 3
 /** The stock building (up to six agents) and the scene width the camera is framed for. */
 const BASE_MIN_X = -9.5
-const BASE_SCENE_WIDTH = 28.7
+const BASE_SCENE_WIDTH = 41.2
 const CAMERA_OFFSET_BASE: Vec3 = [-3.9, 15.2, 18.8]
 
 /**
@@ -151,6 +164,11 @@ function idleStops(building: OfficeLayout['building'], baksoCart: Vec3, kopiBike
     { key: 'kopi', label: 'Coffee at the kopi bike', spots: [stallSpot(kopiBike, -0.5, 0.85, Math.PI), stallSpot(kopiBike, 0.5, 0.85, Math.PI), stallSpot(kopiBike, 1.45, 0.3, -Math.PI / 2)] },
     { key: 'game', label: 'Playing ping-pong', spots: [spot(PING_PONG[0] - 1.75, PING_PONG[2], Math.PI / 2), spot(PING_PONG[0] + 1.75, PING_PONG[2], -Math.PI / 2), spot(BEANBAGS[0][0], BEANBAGS[0][2], Math.PI, true, 'Gaming on the console')] },
     { key: 'arcade', label: 'Playing arcade games', spots: [spot(ARCADES[0][0], ARCADES[0][2] + 0.8, Math.PI), spot(ARCADES[1][0], ARCADES[1][2] + 0.8, Math.PI), spot(BEANBAGS[1][0], BEANBAGS[1][2], Math.PI, true, 'Gaming on the console')] },
+    { key: 'guest_pavilion', label: 'Guest Agent Pavilion', spots: [
+      spot(GUEST_DESKS[0][0], GUEST_DESKS[0][2], Math.PI, true, 'Working at guest station 1'),
+      spot(GUEST_DESKS[1][0], GUEST_DESKS[1][2], Math.PI, true, 'Working at guest station 2'),
+      spot(GUEST_LOUNGE_SOFA[0], GUEST_LOUNGE_SOFA[2], 0, true, 'Relaxing in the guest pavilion'),
+    ] },
     { key: 'jalan', label: 'Taking a stroll', spots: [spot(FLAG[0] - 0.8, FLAG[2] + 0.3, Math.PI / 2), spot(building.minX + 0.95, -0.9, -Math.PI / 2), spot(1.3, -4.4, Math.PI)] },
   ]
 }
@@ -172,13 +190,14 @@ export function createLayout(agentCount: number): OfficeLayout {
   const baksoCart: Vec3 = [-11.9 + shift, 0, -2.3]
   const kopiBike: Vec3 = [-11.9 + shift, 0, 1.6]
   const sceneMinX = minX - 3.7
-  const scale = (GAME_ROOM.maxX - sceneMinX) / BASE_SCENE_WIDTH
+  const sceneMaxX = GUEST_BUILDING.maxX + 1.5
+  const scale = (sceneMaxX - sceneMinX) / BASE_SCENE_WIDTH
   return {
     deskCount, building, desks, beds, baksoCart, kopiBike,
     sideLaneX: -10.15 + shift,
     gangCenterX: -11.4 + shift,
-    camera: { target: [(sceneMinX + GAME_ROOM.maxX) / 2 - 0.15, 0.6, 0.2], offset: CAMERA_OFFSET_BASE.map((value) => value * scale) as Vec3 },
-    pan: { minX: sceneMinX - 0.3, maxX: 17, minZ: -7, maxZ: 11 },
+    camera: { target: [(sceneMinX + sceneMaxX) / 2 - 0.15, 0.6, 0.2], offset: CAMERA_OFFSET_BASE.map((value) => value * scale) as Vec3 },
+    pan: { minX: sceneMinX - 0.3, maxX: 29, minZ: -7, maxZ: 11 },
     idleStops: idleStops(building, baksoCart, kopiBike, beds),
     meetingRoom: meetingRoom(building, deskCount),
   }
@@ -332,7 +351,7 @@ function simplify(from: [number, number], route: [number, number][], to: [number
 
 /** How long an idle agent stays at one stop (walking included). */
 export const IDLE_STOP_MS = 32_000
-export const IDLE_ROUTE = ['lounge', 'galon', 'balkon', 'game', 'bakso', 'tidur', 'jalan', 'arcade', 'lesehan', 'kopi', 'dapur', 'balkon', 'game', 'tidur']
+export const IDLE_ROUTE = ['lounge', 'galon', 'balkon', 'game', 'bakso', 'guest_pavilion', 'tidur', 'jalan', 'arcade', 'lesehan', 'kopi', 'dapur', 'balkon', 'game', 'tidur']
 
 export interface IdleAssignment { stop: IdleStop; placement: Placement }
 

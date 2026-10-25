@@ -333,6 +333,7 @@ export function installAgentFederation(app: Express): void {
       { id: 'fullstack-dev', name: 'Fullstack Dev', role: 'Software & Web Engineering', type: 'internal', status: 'online', color: '#38bdf8' },
       { id: 'qa-engineer', name: 'QA Engineer', role: 'Quality & Ergonomics Assurance', type: 'internal', status: 'online', color: '#f59e0b' },
       { id: 'security-engineer', name: 'Security Engineer', role: 'Cyber Defense & Vulnerability Guard', type: 'internal', status: 'online', color: '#ef4444' },
+      { id: 'guru-tka', name: 'Guru TKA', role: 'Master Academic Mentor & TKA Pedagogy', type: 'internal', status: 'online', color: '#a855f7' },
     ]
 
     const federatedCrew = federated.map((agt) => ({

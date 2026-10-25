@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
-import { ARCADES, BALCONY, BALCONY_DOOR, BALCONY_TABLE, BATHROOM, BEANBAGS, CARROM, COFFEE_TABLE, ENTRANCE_X, FLAG, FLOOR_HEIGHT, type Floor as FloorNumber, GAME_DOOR, GAME_ROOM, GAME_TV, HAMMOCK, LESEHAN_TABLE, LOUNGE_PARTITION_END_Z, MEETING_DOOR_X, PARTITION_X, PING_PONG, SOFA, STAIRS, STALL_ROTATION, type OfficeLayout, TV, type Vec3 } from '../office3d-layout.ts'
-import { AcOutdoorUnit, AirConditioner, ArcadeCabinet, Armchair, BathroomFittings, Beanbag, Bed, Bookshelf, CarromTable, ClothesLine, CoffeeTable, FlagPole, FloorCushion, Fridge, GalonDispenser, Gerobak, Hammock, KopiSepeda, LongTable, LowTable, Nightstand, OfficeChair, OfficeLight, PantryCounter, PingPongTable, Plant, Railing, RattanChair, RBox, SideTable, Sofa, Staircase, StreetLamp, StringLights, Television, Tree, Vendor, WallClock, Wardrobe, WaterTank, Whiteboard } from './props.tsx'
+import { ARCADES, BALCONY, BALCONY_DOOR, BALCONY_TABLE, BATHROOM, BEANBAGS, CARROM, COFFEE_TABLE, ENTRANCE_X, FLAG, FLOOR_HEIGHT, type Floor as FloorNumber, GAME_DOOR, GAME_ROOM, GAME_TV, GUEST_BUILDING, GUEST_DOOR, HAMMOCK, LESEHAN_TABLE, LOUNGE_PARTITION_END_Z, MEETING_DOOR_X, PARTITION_X, PING_PONG, SOFA, STAIRS, STALL_ROTATION, type OfficeLayout, TV, type Vec3 } from '../office3d-layout.ts'
+import { AcOutdoorUnit, AirConditioner, ArcadeCabinet, Armchair, BathroomFittings, Beanbag, Bed, Bookshelf, CarromTable, ClothesLine, CoffeeTable, FlagPole, FloorCushion, Fridge, GalonDispenser, Gerobak, Hammock, KopiSepeda, LongTable, LowTable, Nightstand, OfficeChair, OfficeLight, PantryCounter, PingPongTable, Plant, Railing, RattanChair, RBox, SideTable, Sofa, Staircase, StreetLamp, StringLights, Television, Tree, Vendor, WallClock, Wardrobe, WaterTank, Whiteboard, WorkDesk } from './props.tsx'
 import { asphalt, carpet, grass, pavingStones, tileFloor, woodFloor } from './textures.ts'
 
 // The building (floors, walls, windows, furniture) and its surroundings (yard, sidewalk,
@@ -67,6 +67,59 @@ function GameRoom({ night }: { night: boolean }) {
   </group>
 }
 
+/** Dedicated Guest Agent Pavilion (Standalone building on the right grounds). */
+function GuestPavilion({ night }: { night: boolean }) {
+  const { minX, maxX, minZ, maxZ } = GUEST_BUILDING
+  const floor = useMemo(() => carpet('#232a3b', [3, 3]), [])
+  const rug = useMemo(() => carpet('#3b2d54', [2, 2]), [])
+  return <group>
+    {/* High-tech dark floor with purple-tinted guest lounge rug */}
+    <Floor position={[(minX + maxX) / 2, 0.006, (minZ + maxZ) / 2]} size={[maxX - minX, maxZ - minZ]} map={floor} roughness={0.7}/>
+    <Floor position={[22.2, 0.008, 0.1]} size={[4.8, 2.2]} map={rug} roughness={0.8}/>
+
+    {/* Full-height back, left, and right walls */}
+    <Wall from={[minX, minZ]} to={[maxX, minZ]}/>
+    <Wall from={[minX, minZ]} to={[minX, maxZ]}/>
+    <Wall from={[maxX, minZ]} to={[maxX, maxZ]}/>
+
+    {/* Front wall: low cutaway wall with open entrance doorway for interior visibility */}
+    <Wall from={[minX, maxZ]} to={[GUEST_DOOR.fromX, maxZ]} height={0.55}/>
+    <Wall from={[GUEST_DOOR.toX, maxZ]} to={[maxX, maxZ]} height={0.55}/>
+
+    {/* Glowing Signboard on Front Wall: GUEST AGENT PAVILION */}
+    <RBox position={[(GUEST_DOOR.fromX + GUEST_DOOR.toX) / 2, 0.9, maxZ + 0.02]} size={[2.6, 0.45, 0.08]} radius={0.02} color="#0f172a"/>
+    <RBox position={[(GUEST_DOOR.fromX + GUEST_DOOR.toX) / 2, 0.9, maxZ + 0.06]} size={[2.4, 0.32, 0.02]} radius={0.01} color={night ? '#a855f7' : '#00d2ff'} roughness={0.2}/>
+
+    {/* Windows on back and side walls */}
+    <group rotation={[0, -Math.PI / 2, 0]} position={[maxX - 0.14, 1.55, -2]}><Window position={[0, 0, 0]} width={1.8} night={night}/></group>
+    <group rotation={[0, Math.PI / 2, 0]} position={[minX + 0.14, 1.55, -2]}><Window position={[0, 0, 0]} width={1.8} night={night}/></group>
+    {[19.8, 24.2].map((x) => <Window key={x} position={[x, 1.55, minZ + 0.14]} night={night}/>)}
+
+    {/* 4 Dedicated Guest Workstations */}
+    <WorkDesk position={[19.6, 0, -3.6]} active={true}/>
+    <WorkDesk position={[22.2, 0, -3.6]} active={false}/>
+    <WorkDesk position={[19.6, 0, -1.6]} active={true}/>
+    <WorkDesk position={[22.2, 0, -1.6]} active={false}/>
+
+    {/* Guest Lounge: Sofa, Coffee Table, TV Wall Display */}
+    <Sofa position={[22.2, 0, 0.5]} rotation={0} color="#6366f1"/>
+    <CoffeeTable position={[22.2, 0, -0.3]}/>
+    <Television position={[25.8, 1.35, -0.4]}/>
+
+    {/* Amenities & Decor */}
+    <Plant position={[minX + 0.6, 0, minZ + 0.6]} size={0.9}/>
+    <Plant position={[maxX - 0.6, 0, maxZ - 0.6]} size={0.9}/>
+    <Bookshelf position={[maxX - 0.4, 0, -3.8]} rotation={-Math.PI / 2}/>
+    <GalonDispenser position={[minX + 0.45, 0, -0.2]} rotation={Math.PI / 2}/>
+    <AirConditioner position={[(minX + maxX) / 2, 2.3, minZ + 0.125]}/>
+
+    {/* Ceiling Lights */}
+    {[[20.5, 2.4, -3.2], [23.8, 2.4, -3.2], [22.2, 2.4, -0.5]].map((pos) => (
+      <OfficeLight key={pos.join(',')} position={pos as Vec3} night={night}/>
+    ))}
+  </group>
+}
+
 function Building({ night, layout }: { night: boolean; layout: OfficeLayout }) {
   const { minX, maxX, minZ, maxZ } = layout.building
   const wood = useMemo(() => woodFloor([4, 4]), [])
@@ -124,6 +177,7 @@ function Building({ night, layout }: { night: boolean; layout: OfficeLayout }) {
     {[...layout.desks.map(([x, , z]): Vec3 => [x, 2.4, z + 0.2]),  [(layout.meetingRoom.table.x1 + layout.meetingRoom.table.x2) / 2, 2.4, layout.meetingRoom.table.z] as Vec3, [COFFEE_TABLE[0], 2.4, COFFEE_TABLE[2] + 0.4] as Vec3, [8.2, 2.4, 1.2] as Vec3].map((position) => <OfficeLight key={position.join(',')} position={position} night={night}/>)}
     <Stairs/>
     <GameRoom night={night}/>
+    <GuestPavilion night={night}/>
   </group>
 }
 
@@ -201,6 +255,14 @@ function BuildingShell({ night, layout }: { night: boolean; layout: OfficeLayout
     <RBox position={[(g.minX + g.maxX) / 2, WALL_HEIGHT + 0.08, (g.minZ + g.maxZ) / 2]} size={[g.maxX - g.minX + 0.3, 0.16, g.maxZ - g.minZ + 0.3]} radius={0.02} color="#9a9a94" roughness={0.95}/>
     <WaterTank position={[14.2, WALL_HEIGHT + 0.16, -3.8]}/>
     <AcOutdoorUnit position={[11.2, WALL_HEIGHT + 0.16, -4.3]}/>
+    {/* Dedicated Guest Agent Pavilion Shell (enclosed with roof and AC) */}
+    <Wall from={[GUEST_BUILDING.minX, GUEST_BUILDING.minZ]} to={[GUEST_BUILDING.maxX, GUEST_BUILDING.minZ]}/>
+    <Wall from={[GUEST_BUILDING.minX, GUEST_BUILDING.minZ]} to={[GUEST_BUILDING.minX, GUEST_BUILDING.maxZ]}/>
+    <Wall from={[GUEST_BUILDING.maxX, GUEST_BUILDING.minZ]} to={[GUEST_BUILDING.maxX, GUEST_BUILDING.maxZ]}/>
+    <Wall from={[GUEST_BUILDING.minX, GUEST_BUILDING.maxZ]} to={[GUEST_BUILDING.maxX, GUEST_BUILDING.maxZ]}/>
+    {[20, 24].map((x) => <Window key={x} position={[x, 1.45, GUEST_BUILDING.maxZ + 0.14]} width={1.4} night={night}/>)}
+    <RBox position={[(GUEST_BUILDING.minX + GUEST_BUILDING.maxX) / 2, WALL_HEIGHT + 0.08, (GUEST_BUILDING.minZ + GUEST_BUILDING.maxZ) / 2]} size={[GUEST_BUILDING.maxX - GUEST_BUILDING.minX + 0.3, 0.16, GUEST_BUILDING.maxZ - GUEST_BUILDING.minZ + 0.3]} radius={0.02} color="#8a8a94" roughness={0.95}/>
+    <AcOutdoorUnit position={[GUEST_BUILDING.minX + 1.8, WALL_HEIGHT + 0.16, GUEST_BUILDING.minZ + 0.9]}/>
     <Stairs/>
   </group>
 }
@@ -296,6 +358,8 @@ function Outdoors({ night, layout }: { night: boolean; layout: OfficeLayout }) {
     <Floor position={[shift / 2, -0.01, 12.1]} size={[60 - shift, 5]} map={road} roughness={0.95}/>
     {/* Path from the entrance to the sidewalk */}
     <Floor position={[5.8, 0, 4.7]} size={[1.8, 1]} map={sidewalk}/>
+    {/* Paved path connecting the sidewalk to the Guest Agent Pavilion entrance */}
+    <Floor position={[22.25, 0, 3.1]} size={[2.5, 3.2]} map={sidewalk}/>
     {/* Merah Putih by the entrance */}
     <FlagPole position={FLAG}/>
     {/* The gang (alley) left of the building, with the street food out of the main view */}
