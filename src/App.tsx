@@ -94,12 +94,57 @@ function Shell({ onRefresh, access, onAccessChange }: { onRefresh: () => void; a
   return <div className={`app${page === 'Office' ? ' app-office' : ''}`}>
     {menuOpen && <div className="drawer-backdrop" onClick={closeMenu} aria-hidden="true"/>}
     <aside id="app-sidebar" className="drawer" ref={drawer} hidden={!menuOpen} aria-label="Menu">
-      <div className="drawer-head"><a className="brand" href="#/office" onClick={(event) => { event.preventDefault(); navigate(HOME) }}>RUANG<span>HERMES 3D</span></a><button type="button" className="icon-button" onClick={closeMenu} aria-label="Close menu" title="Close menu (Esc)">✕</button></div>
+      <div className="drawer-head">
+        <a className="brand" href="#/office" onClick={(event) => { event.preventDefault(); navigate(HOME) }}>
+          <img src="/assets/duck-emblem.png" alt="Duckvaulta" className="brand-icon-img" />
+          <div className="brand-text-wrap">
+            <span className="brand-name">DUCKVAULTA</span>
+            <span className="brand-sub">AI OFFICE 3D</span>
+          </div>
+        </a>
+        <button type="button" className="icon-button" onClick={closeMenu} aria-label="Close menu" title="Close menu (Esc)">✕</button>
+      </div>
       <nav aria-label="Main">{navigation.map((item) => <a href={`#/${pageSlug(item)}`} className={page === item ? 'active' : ''} aria-current={page === item ? 'page' : undefined} key={item} onClick={(event) => { event.preventDefault(); navigate(item) }}>{item}{item === 'Logs' && data && data.commands.failed > 0 && <span className="nav-badge" title="Failed CLI reads">{data.commands.failed}</span>}</a>)}</nav>
-      <div className="sidebar-note"><span className="dot"/> READ-ONLY MODE</div>
-      <small className="drawer-hint">Press M to open or close this menu</small>
+      <div className="sidebar-links">
+        <a href="https://duckvaulta.ai.id" target="_blank" rel="noopener noreferrer" className="drawer-ext-link">
+          <span>Main Sovereign Portal</span>
+          <span>↗</span>
+        </a>
+        <a href="https://godeye.duckvaulta.ai.id" target="_blank" rel="noopener noreferrer" className="drawer-ext-link">
+          <span>God's Eye View (GEV)</span>
+          <span>↗</span>
+        </a>
+      </div>
+      <div className="sidebar-note"><span className="dot"/> MISSION CONTROL (ACTIVE)</div>
+      <small className="drawer-hint">Press M to open or close menu</small>
     </aside>
-    <main><header><span className="header-title"><button type="button" ref={menuButton} className="icon-button menu-button" onClick={() => (menuOpen ? closeMenu() : setMenuOpen(true))} aria-controls="app-sidebar" aria-expanded={menuOpen} aria-label={menuOpen ? 'Close menu' : 'Open menu'} title="Menu (M)">☰{alerts > 0 && <span className="menu-alert" aria-label={`${alerts} alert${alerts === 1 ? '' : 's'} in the menu`}/>}</button><span>RUANG / {page.toUpperCase()}</span></span><span className="header-actions"><span className={`sync-label${dashboard.status === 'failed' ? ' text-bad' : ''}`}>{syncLabel}</span><button type="button" className="icon-button theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>{theme === 'dark' ? '☀' : '☾'}</button><button type="button" className="refresh-button" onClick={onRefresh} aria-label="Refresh all sources">↻ REFRESH</button></span></header>
+    <main>
+      <header>
+        <span className="header-title">
+          <button type="button" ref={menuButton} className="icon-button menu-button" onClick={() => (menuOpen ? closeMenu() : setMenuOpen(true))} aria-controls="app-sidebar" aria-expanded={menuOpen} aria-label={menuOpen ? 'Close menu' : 'Open menu'} title="Menu (M)">
+            ☰{alerts > 0 && <span className="menu-alert" aria-label={`${alerts} alert${alerts === 1 ? '' : 's'} in the menu`}/>}
+          </button>
+          <a href="#/office" className="header-brand-link" onClick={(event) => { event.preventDefault(); navigate(HOME) }}>
+            <img src="/assets/duck-emblem.png" alt="Duckvaulta" className="header-brand-img" />
+            <span className="header-brand-title">DUCKVAULTA</span>
+            <span className="header-brand-pill">AI OFFICE</span>
+          </a>
+          <span className="header-breadcrumb">/ {page.toUpperCase()}</span>
+        </span>
+        <span className="header-actions">
+          <a href="https://duckvaulta.ai.id" target="_blank" rel="noopener noreferrer" className="portal-shortcut-btn" title="Back to Duckvaulta Sovereign Portal">
+            PORTAL ↗
+          </a>
+          <span className={`sync-label${dashboard.status === 'failed' ? ' text-bad' : ''}`}>
+            <span className="sync-pulse-dot" />
+            {syncLabel}
+          </span>
+          <button type="button" className="icon-button theme-toggle" onClick={toggleTheme} aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`} title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}>
+            {theme === 'dark' ? '☀' : '☾'}
+          </button>
+          <button type="button" className="refresh-button" onClick={onRefresh} aria-label="Refresh all sources">↻ REFRESH</button>
+        </span>
+      </header>
       {versionNotice && <section className="notice version-notice" role="alert"><strong>Restart needed.</strong> {versionNotice}</section>}
       {content}
     </main></div>
