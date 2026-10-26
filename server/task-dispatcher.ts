@@ -3,7 +3,13 @@ import { promisify } from 'node:util'
 import { join } from 'node:path'
 import { promises as fsp } from 'node:fs'
 import type { Request, Response, Express } from 'express'
-import { verifySessionToken, sanitizeText, isSafeIdentifier, isValidTaskContent } from './security.js'
+import {
+  sanitizeText,
+  isSafeIdentifier,
+  isValidTaskContent,
+  isValidInstructionContent,
+  authenticateRequest,
+} from './security.js'
 import { dispatchTaskToFederatedAgent } from './agent-federation.js'
 
 const execFileAsync = promisify(execFile)
@@ -85,14 +91,13 @@ export function installTaskDispatcher(app: Express): void {
   // 1. Create and Dispatch Task from Web UI
   app.post('/api/company/tasks/create', async (req: Request, res: Response) => {
     try {
-      const authHeader = req.headers.authorization || ''
-      const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
-      const session = verifySessionToken(token)
-
-      if (!session || !session.email) {
+      const auth = authenticateRequest(req)
+      if (!auth.authenticated || !auth.user) {
         res.status(401).json({ error: 'Autentikasi diperlukan untuk mendelegasikan tugas.' })
         return
       }
+
+      const session = auth.user
 
       // STRICT RBAC: Only operators and admins can create tasks
       if (session.role !== 'admin' && session.role !== 'operator') {
@@ -194,14 +199,13 @@ export function installTaskDispatcher(app: Express): void {
   // 2. Direct Instruction Dispatcher
   app.post('/api/company/instruct', async (req: Request, res: Response) => {
     try {
-      const authHeader = req.headers.authorization || ''
-      const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
-      const session = verifySessionToken(token)
-
-      if (!session || !session.email) {
+      const auth = authenticateRequest(req)
+      if (!auth.authenticated || !auth.user) {
         res.status(401).json({ error: 'Autentikasi diperlukan untuk mengirim instruksi.' })
         return
       }
+
+      const session = auth.user
 
       // STRICT RBAC: Only operators and admins can send direct instructions
       if (session.role !== 'admin' && session.role !== 'operator') {
@@ -215,6 +219,12 @@ export function installTaskDispatcher(app: Express): void {
       const { agent, instruction } = req.body || {}
       if (!agent || !instruction) {
         res.status(400).json({ error: 'Target agen dan teks instruksi wajib diisi.' })
+        return
+      }
+
+      const valCheck = isValidInstructionContent(instruction)
+      if (!valCheck.valid) {
+        res.status(400).json({ error: valCheck.reason })
         return
       }
 
@@ -266,13 +276,11 @@ export function installTaskDispatcher(app: Express): void {
 
   // 3. Get Dispatched Tasks History (Redacts creator email/name if unauthenticated)
   app.get('/api/company/tasks/history', async (req: Request, res: Response) => {
-    const authHeader = req.headers.authorization || ''
-    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
-    const session = verifySessionToken(token)
+    const auth = authenticateRequest(req)
 
     const tasks = await loadDispatchedTasks()
     const safeTasks = tasks.slice(0, 50).map((t) => {
-      if (session && session.email) return t
+      if (auth.authenticated && auth.user?.email) return t
       return {
         ...t,
         creatorEmail: undefined,
@@ -286,13 +294,11 @@ export function installTaskDispatcher(app: Express): void {
     })
   })
 
-  // 4. Get Instructions History (Requires valid session token)
+  // 4. Get Instructions History (Requires valid session token or operator key)
   app.get('/api/company/instructions/history', async (req: Request, res: Response) => {
-    const authHeader = req.headers.authorization || ''
-    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
-    const session = verifySessionToken(token)
+    const auth = authenticateRequest(req)
 
-    if (!session || !session.email) {
+    if (!auth.authenticated || !auth.user?.email) {
       res.status(401).json({ error: 'Authentication required to access instruction logs.' })
       return
     }

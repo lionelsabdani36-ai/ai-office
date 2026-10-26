@@ -1,7 +1,17 @@
 import { join } from 'node:path'
 import { promises as fsp } from 'node:fs'
 import type { Request, Response, Express } from 'express'
-import { generateSecureKey, sanitizeText, isSafeIdentifier, verifySessionToken, isSafeWebhookUrl, safeCompare } from './security.js'
+import {
+  generateSecureKey,
+  sanitizeText,
+  isSafeIdentifier,
+  isSafeWebhookUrl,
+  safeCompare,
+  isBufferSpam,
+  signWebhookPayload,
+  resolveAndValidateHost,
+  authenticateRequest,
+} from './security.js'
 
 const DATA_DIR = join(process.cwd(), 'data')
 const FEDERATED_AGENTS_FILE = join(DATA_DIR, 'federated_agents.json')
@@ -152,20 +162,38 @@ export async function dispatchTaskToFederatedAgent(agentIdentifier: string, task
   queuedTasks.push(queueEntry)
   await saveAgentTasks(queuedTasks)
 
-  // If agent has configured webhook URL, fire notification asynchronously (with SSRF protection)
+  // If agent has configured webhook URL, fire notification asynchronously (with SSRF protection & HMAC signature)
   if (agent.endpointUrl && isSafeWebhookUrl(agent.endpointUrl)) {
-    fetch(agent.endpointUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Duckvaulta-Agent-Key': agent.apiKey,
-        'User-Agent': 'Duckvaulta-Company-Federation',
-      },
-      body: JSON.stringify({
-        event: 'task_assigned',
-        task: queueEntry,
-      }),
-    }).catch((err) => console.warn(`Webhook dispatch warning for agent ${agent.name}:`, err.message))
+    try {
+      const parsedUrl = new URL(agent.endpointUrl)
+      resolveAndValidateHost(parsedUrl.hostname).then((safeHost) => {
+        if (!safeHost) {
+          console.warn(`[SSRF_BLOCKED] Webhook host ${parsedUrl.hostname} resolved to restricted/private IP.`)
+          return
+        }
+
+        const payload = JSON.stringify({
+          event: 'task_assigned',
+          task: queueEntry,
+          timestamp: new Date().toISOString(),
+        })
+        const signature = signWebhookPayload(payload, agent.apiKey)
+
+        fetch(agent.endpointUrl!, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Duckvaulta-Agent-Key': agent.apiKey,
+            'X-Duckvaulta-Signature': signature,
+            'X-Duckvaulta-Timestamp': new Date().toISOString(),
+            'User-Agent': 'Duckvaulta-Company-Federation',
+          },
+          body: payload,
+        }).catch((err) => console.warn(`Webhook dispatch warning for agent ${agent.name}:`, err.message))
+      }).catch((err) => console.warn(`DNS resolution error for ${parsedUrl.hostname}:`, err.message))
+    } catch (err) {
+      console.warn(`Webhook dispatch error for agent ${agent.name}:`, err)
+    }
   }
 
   return true
@@ -175,14 +203,13 @@ export function installAgentFederation(app: Express): void {
   // 1. Generate Invite Token for Friend's Agent
   app.post('/api/company/agents/invite', async (req: Request, res: Response) => {
     try {
-      const authHeader = req.headers.authorization || ''
-      const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
-      const session = verifySessionToken(token)
-
-      if (!session || !session.email) {
+      const auth = authenticateRequest(req)
+      if (!auth.authenticated || !auth.user) {
         res.status(401).json({ error: 'Autentikasi diperlukan untuk membuat kunci undangan.' })
         return
       }
+
+      const session = auth.user
 
       // STRICT RBAC: Only operators and admins can create invite keys
       if (session.role !== 'admin' && session.role !== 'operator') {
@@ -194,6 +221,12 @@ export function installAgentFederation(app: Express): void {
       }
 
       const { label = 'Friend Agent Invite', maxUses = 1, daysValid = 7 } = req.body || {}
+      const spamCheck = isBufferSpam(String(label))
+      if (spamCheck.spam) {
+        res.status(400).json({ error: `Label: ${spamCheck.reason}` })
+        return
+      }
+
       const safeMaxUses = Math.min(20, Math.max(1, Number(maxUses) || 1))
       const safeDaysValid = Math.min(30, Math.max(1, Number(daysValid) || 1))
       const inviteKey = `dck_inv_${generateSecureKey(16)}`
@@ -227,15 +260,13 @@ export function installAgentFederation(app: Express): void {
 
   // 2. List Active Invites
   app.get('/api/company/agents/invites', async (req: Request, res: Response) => {
-    const authHeader = req.headers.authorization || ''
-    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
-    const session = verifySessionToken(token)
-
-    if (!session || !session.email) {
+    const auth = authenticateRequest(req)
+    if (!auth.authenticated || !auth.user) {
       res.status(401).json({ error: 'Authentication required.' })
       return
     }
 
+    const session = auth.user
     const invites = await loadInvites()
     const now = Date.now()
     const activeInvites = invites.filter((inv) => new Date(inv.expiresAt).getTime() > now && inv.usesLeft > 0)
@@ -278,15 +309,40 @@ export function installAgentFederation(app: Express): void {
         return
       }
 
+      const nameSpam = isBufferSpam(cleanName)
+      if (nameSpam.spam) {
+        res.status(400).json({ error: `Nama agen: ${nameSpam.reason}` })
+        return
+      }
+
+      const descSpam = isBufferSpam(cleanDesc)
+      if (descSpam.spam) {
+        res.status(400).json({ error: `Deskripsi: ${descSpam.reason}` })
+        return
+      }
+
       const normalizedName = cleanName.toLowerCase().replace(/[\s_\-]+/g, '-')
       if (RESERVED_AGENT_NAMES.includes(normalizedName)) {
         res.status(400).json({ error: 'Reserved identifier. Guest agents cannot use internal agent names.' })
         return
       }
 
-      if (cleanEndpoint && !isSafeWebhookUrl(cleanEndpoint)) {
-        res.status(400).json({ error: 'Invalid or forbidden webhook URL. Localhost and private network targets are blocked.' })
-        return
+      if (cleanEndpoint) {
+        if (!isSafeWebhookUrl(cleanEndpoint)) {
+          res.status(400).json({ error: 'Invalid or forbidden webhook URL. Localhost and private network targets are blocked.' })
+          return
+        }
+        try {
+          const parsed = new URL(cleanEndpoint)
+          const safeHost = await resolveAndValidateHost(parsed.hostname)
+          if (!safeHost) {
+            res.status(400).json({ error: 'Invalid or forbidden webhook target: host resolves to private/restricted IP.' })
+            return
+          }
+        } catch {
+          res.status(400).json({ error: 'Invalid webhook URL.' })
+          return
+        }
       }
 
       // Validate Invite Key
@@ -449,7 +505,7 @@ export function installAgentFederation(app: Express): void {
     })
   })
 
-  // 7. Ping / Health-Check a Federated Agent Webhook
+  // 7. Ping / Health-Check a Federated Agent Webhook (with SSRF Defense & HMAC signature)
   app.post('/api/company/agents/:agentId/ping', async (req: Request, res: Response) => {
     try {
       const { agentId } = req.params
@@ -466,9 +522,37 @@ export function installAgentFederation(app: Express): void {
         return
       }
 
+      if (!isSafeWebhookUrl(agent.endpointUrl)) {
+        res.status(400).json({
+          success: false,
+          reachable: false,
+          error: 'SSRF_BLOCKED',
+          message: 'Endpoint webhook diblokir oleh sistem proteksi SSRF (target internal/loopback/privat dilarang).',
+        })
+        return
+      }
+
+      const parsedUrl = new URL(agent.endpointUrl)
+      const safeHost = await resolveAndValidateHost(parsedUrl.hostname)
+      if (!safeHost) {
+        res.status(400).json({
+          success: false,
+          reachable: false,
+          error: 'SSRF_DNS_BLOCKED',
+          message: 'Host webhook menyelesaikan ke alamat IP privat/internal (DNS Rebinding dicegah).',
+        })
+        return
+      }
+
       const t0 = Date.now()
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+      const pingBody = JSON.stringify({
+        event: 'ping_health_check',
+        timestamp: new Date().toISOString(),
+      })
+      const signature = signWebhookPayload(pingBody, agent.apiKey)
 
       try {
         const pingRes = await fetch(agent.endpointUrl, {
@@ -476,12 +560,11 @@ export function installAgentFederation(app: Express): void {
           headers: {
             'Content-Type': 'application/json',
             'X-Duckvaulta-Agent-Key': agent.apiKey,
+            'X-Duckvaulta-Signature': signature,
+            'X-Duckvaulta-Timestamp': new Date().toISOString(),
             'User-Agent': 'Duckvaulta-Federation-Ping',
           },
-          body: JSON.stringify({
-            event: 'ping_health_check',
-            timestamp: new Date().toISOString(),
-          }),
+          body: pingBody,
           signal: controller.signal,
         })
         clearTimeout(timeoutId)
@@ -525,11 +608,8 @@ export function installAgentFederation(app: Express): void {
   // 8. Revoke / Remove a Federated Agent (Admin Only)
   app.delete('/api/company/agents/:agentId', async (req: Request, res: Response) => {
     try {
-      const authHeader = req.headers.authorization || ''
-      const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
-      const session = verifySessionToken(token)
-
-      if (!session || (session.role !== 'admin' && session.role !== 'operator')) {
+      const auth = authenticateRequest(req)
+      if (!auth.authenticated || !auth.user || (auth.user.role !== 'admin' && auth.user.role !== 'operator')) {
         res.status(403).json({ error: 'Hanya Operator atau Admin yang berhak mencabut agen.' })
         return
       }

@@ -1,5 +1,20 @@
 import { describe, it, expect } from 'vitest'
-import { isSafeWebhookUrl, safeCompare, sanitizeText, signSessionToken, verifySessionToken } from './security.js'
+import {
+  isSafeWebhookUrl,
+  safeCompare,
+  sanitizeText,
+  signSessionToken,
+  verifySessionToken,
+  validateOperatorKey,
+  checkOperatorLoginRateLimit,
+  recordOperatorLoginFailure,
+  recordOperatorLoginSuccess,
+  authenticateRequest,
+  isBufferSpam,
+  isValidTaskContent,
+  isValidInstructionContent,
+  signWebhookPayload,
+} from './security.js'
 
 describe('Security Hardening & Cyber Defense Verification', () => {
   describe('SSRF Protection (isSafeWebhookUrl)', () => {
@@ -365,6 +380,190 @@ describe('Security Hardening & Cyber Defense Verification', () => {
       const forgedToken = `${payload}.${oldSig}`
 
       expect(verifySessionToken(forgedToken)).toBeNull()
+    })
+  })
+
+  describe('Advanced SSRF Bypass Defense', () => {
+    it('blocks alternative numeric representations of loopback (decimal integer, hex, octal)', () => {
+      // 2130706433 = 127.0.0.1 in decimal integer
+      expect(isSafeWebhookUrl('http://2130706433/webhook')).toBe(false)
+      // 0x7f000001 = 127.0.0.1 in hex
+      expect(isSafeWebhookUrl('http://0x7f000001/webhook')).toBe(false)
+      // 0177.0.0.1 = 127.0.0.1 in octal
+      expect(isSafeWebhookUrl('http://0177.0.0.1/webhook')).toBe(false)
+      // 127.1 = 127.0.0.1 shortened
+      expect(isSafeWebhookUrl('http://127.1/api')).toBe(false)
+    })
+
+    it('blocks the entire 127.0.0.0/8 loopback block', () => {
+      expect(isSafeWebhookUrl('http://127.0.0.2:8080/')).toBe(false)
+      expect(isSafeWebhookUrl('http://127.1.2.3/')).toBe(false)
+      expect(isSafeWebhookUrl('http://127.255.255.254/')).toBe(false)
+    })
+
+    it('blocks carrier-grade NAT 100.64.0.0/10 and current-network 0.0.0.0/8', () => {
+      expect(isSafeWebhookUrl('http://100.64.0.1/status')).toBe(false)
+      expect(isSafeWebhookUrl('http://100.127.255.255/webhook')).toBe(false)
+      expect(isSafeWebhookUrl('http://0.0.0.0/')).toBe(false)
+      expect(isSafeWebhookUrl('http://0.1.2.3/')).toBe(false)
+    })
+
+    it('blocks wildcard DNS rebinding domains', () => {
+      expect(isSafeWebhookUrl('http://127.0.0.1.nip.io/webhook')).toBe(false)
+      expect(isSafeWebhookUrl('http://test.sslip.io/')).toBe(false)
+      expect(isSafeWebhookUrl('http://app.localtest.me/')).toBe(false)
+      expect(isSafeWebhookUrl('http://sub.lvh.me/')).toBe(false)
+    })
+
+    it('blocks sensitive internal ports', () => {
+      // Sensitive internal services: SSH, SMTP, Ruang (3001), Auth (3002), Ollama (11434), Hermes (20128)
+      expect(isSafeWebhookUrl('http://example.com:22/')).toBe(false)
+      expect(isSafeWebhookUrl('http://example.com:3001/')).toBe(false)
+      expect(isSafeWebhookUrl('http://example.com:3002/')).toBe(false)
+      expect(isSafeWebhookUrl('http://example.com:11434/')).toBe(false)
+      expect(isSafeWebhookUrl('http://example.com:20128/')).toBe(false)
+      expect(isSafeWebhookUrl('http://example.com:6379/')).toBe(false)
+    })
+
+    it('blocks URLs with embedded credentials and dangerous schemes', () => {
+      expect(isSafeWebhookUrl('http://admin:pass@example.com/')).toBe(false)
+      expect(isSafeWebhookUrl('gopher://127.0.0.1:6379/')).toBe(false)
+      expect(isSafeWebhookUrl('file:///etc/passwd')).toBe(false)
+      expect(isSafeWebhookUrl('ftp://example.com/')).toBe(false)
+    })
+  })
+
+  describe('Operator Key Validation & Progressive Lockout', () => {
+    it('validates operator key safely from persistent file and rejects wrong keys', () => {
+      // Wrong keys
+      expect(validateOperatorKey('')).toBe(false)
+      expect(validateOperatorKey('short')).toBe(false)
+      expect(validateOperatorKey('wrong-invalid-key-attempt')).toBe(false)
+      expect(validateOperatorKey('1234567')).toBe(false)
+    })
+
+    it('throttles failed operator login attempts and activates progressive lockout', () => {
+      const testIp = '198.51.100.55' // RFC 5737 test IP
+      expect(checkOperatorLoginRateLimit(testIp).allowed).toBe(true)
+
+      // Simulate 5 failed attempts
+      for (let i = 0; i < 5; i++) {
+        recordOperatorLoginFailure(testIp)
+      }
+
+      // 6th attempt should be locked out
+      const locked = checkOperatorLoginRateLimit(testIp)
+      expect(locked.allowed).toBe(false)
+      expect(locked.retryAfterMs).toBeGreaterThan(0)
+
+      // Reset on success
+      recordOperatorLoginSuccess(testIp)
+      expect(checkOperatorLoginRateLimit(testIp).allowed).toBe(true)
+    })
+  })
+
+  describe('Strict RBAC & AuthenticateRequest', () => {
+    it('authenticates valid signed bearer token correctly', () => {
+      const token = signSessionToken({
+        id: 'usr_admin',
+        email: 'operator@duckvaulta.ai.id',
+        name: 'Lead Operator',
+        role: 'admin',
+        provider: 'operator_key',
+      })
+
+      const mockReq = {
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      } as any
+
+      const auth = authenticateRequest(mockReq)
+      expect(auth.authenticated).toBe(true)
+      expect(auth.user?.role).toBe('admin')
+      expect(auth.user?.email).toBe('operator@duckvaulta.ai.id')
+    })
+
+    it('rejects unauthenticated or tampered request', () => {
+      const mockReqNoAuth = { headers: {} } as any
+      expect(authenticateRequest(mockReqNoAuth).authenticated).toBe(false)
+
+      const mockReqBadSig = {
+        headers: {
+          authorization: 'Bearer bad.token.here',
+        },
+      } as any
+      expect(authenticateRequest(mockReqBadSig).authenticated).toBe(false)
+    })
+  })
+
+  describe('Buffer Spam & Repetition Filtering', () => {
+    it('rejects single-character flooding (>= 10 consecutive identical chars)', () => {
+      const flood = 'Normal prefix aaaaaaaaaa suffix'
+      expect(isBufferSpam(flood).spam).toBe(true)
+      expect(isValidTaskContent('Clean Title', flood).valid).toBe(false)
+      expect(isValidInstructionContent(flood).valid).toBe(false)
+    })
+
+    it('rejects cyclic 2-character repeating patterns (e.g. ababababab)', () => {
+      const cyclic2 = 'abababababab'
+      expect(isBufferSpam(cyclic2).spam).toBe(true)
+      expect(isValidTaskContent('Task', cyclic2).valid).toBe(false)
+    })
+
+    it('rejects cyclic 3-character repeating patterns (e.g. abcabcabcabc)', () => {
+      const cyclic3 = 'abcabcabcabc'
+      expect(isBufferSpam(cyclic3).spam).toBe(true)
+    })
+
+    it('rejects cyclic 4-8 character phrase repetitions (e.g. spam_spam_spam_)', () => {
+      const phraseSpam = 'spam_spam_spam_'
+      expect(isBufferSpam(phraseSpam).spam).toBe(true)
+    })
+
+    it('rejects ASCII control characters and null byte injection vectors', () => {
+      expect(isBufferSpam('Attack\x00Payload').spam).toBe(true)
+      expect(isBufferSpam('Attack\x07Beep').spam).toBe(true)
+      expect(isBufferSpam('Attack\x1bEscape').spam).toBe(true)
+    })
+
+    it('rejects zero-width and invisible unicode character floods', () => {
+      const zeroWidthFlood = 'Text\u200B\u200C\u200DHidden'
+      expect(isBufferSpam(zeroWidthFlood).spam).toBe(true)
+    })
+
+    it('rejects excessive newline and whitespace flooding', () => {
+      const newlineFlood = 'Line 1\n\n\n\n\nLine 2'
+      expect(isBufferSpam(newlineFlood).spam).toBe(true)
+      const spaceFlood = 'Word' + ' '.repeat(30) + 'Word'
+      expect(isBufferSpam(spaceFlood).spam).toBe(true)
+    })
+
+    it('rejects low-entropy repetitive fuzzing strings', () => {
+      const lowEntropy = '0101010101010101010101010101010101010101'
+      expect(isBufferSpam(lowEntropy).spam).toBe(true)
+    })
+
+    it('allows valid human sentences and technical tasks without false positives', () => {
+      const validTitle = 'Implementasi Audit Keamanan & Hardening Port'
+      const validDesc = 'Lakukan validasi zero-trust perimeter pada port internal 3001, 4173, dan 11434. Pastikan enkripsi TLS aktif dan cert valid.'
+      const validInstruct = 'Jalankan verifikasi port hardening dan laporkan hasilnya.'
+
+      expect(isValidTaskContent(validTitle, validDesc).valid).toBe(true)
+      expect(isValidInstructionContent(validInstruct).valid).toBe(true)
+    })
+  })
+
+  describe('Webhook HMAC Signature Generation', () => {
+    it('generates consistent sha256 HMAC signatures', () => {
+      const payload = JSON.stringify({ event: 'ping', test: true })
+      const key = 'secret-agent-key-12345'
+      const sig1 = signWebhookPayload(payload, key)
+      const sig2 = signWebhookPayload(payload, key)
+
+      expect(sig1).toBe(sig2)
+      expect(sig1.startsWith('sha256=')).toBe(true)
+      expect(sig1.length).toBe(7 + 64)
     })
   })
 })

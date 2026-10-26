@@ -1,7 +1,15 @@
 import { join } from 'node:path'
 import type { Request, Response, Express } from 'express'
 import { promises as fsp } from 'node:fs'
-import { signSessionToken, verifySessionToken, sanitizeText, validateOperatorKey } from './security.js'
+import {
+  signSessionToken,
+  sanitizeText,
+  validateOperatorKey,
+  checkOperatorLoginRateLimit,
+  recordOperatorLoginFailure,
+  recordOperatorLoginSuccess,
+  authenticateRequest,
+} from './security.js'
 
 const DATA_DIR = join(process.cwd(), 'data')
 const USERS_FILE = join(DATA_DIR, 'users.json')
@@ -94,19 +102,33 @@ export function installOAuth(app: Express): void {
     })
   })
 
-  // 1b. Master Operator Key Authentication (Zero-Trust Master Passkey)
+  // 1b. Master Operator Key Authentication (Zero-Trust Master Passkey with Anti-Brute-Force Throttle)
   app.post('/api/auth/operator/login', async (req: Request, res: Response) => {
     try {
+      const ip = req.ip || req.socket.remoteAddress || '127.0.0.1'
+      const rateCheck = checkOperatorLoginRateLimit(ip)
+      if (!rateCheck.allowed) {
+        res.status(429).json({
+          error: 'Terlalu banyak percobaan autentikasi operator yang gagal. Silakan tunggu beberapa saat.',
+          retryAfterMs: rateCheck.retryAfterMs,
+        })
+        return
+      }
+
       const { key, operatorName } = req.body || {}
       if (!key || typeof key !== 'string') {
+        recordOperatorLoginFailure(ip)
         res.status(400).json({ error: 'Master Operator Key wajib diisi.' })
         return
       }
 
       if (!validateOperatorKey(key)) {
+        recordOperatorLoginFailure(ip)
         res.status(401).json({ error: 'Master Operator Key tidak valid atau salah.' })
         return
       }
+
+      recordOperatorLoginSuccess(ip)
 
       const adminUser: UserAccount = {
         id: 'usr_lead_operator',
@@ -334,36 +356,26 @@ export function installOAuth(app: Express): void {
     }
   })
 
-  // 4. Current User Session Check
+  // 4. Current User Session Check (Supports Bearer token and X-Operator-Key)
   app.get('/api/auth/me', async (req: Request, res: Response) => {
-    const authHeader = req.headers.authorization || ''
-    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
-    if (!token) {
-      res.status(401).json({ authenticated: false, user: null })
-      return
-    }
-
-    const payload = verifySessionToken(token)
-    if (!payload || !payload.email) {
-      res.status(401).json({ authenticated: false, error: 'Invalid or expired session token.' })
+    const auth = authenticateRequest(req)
+    if (!auth.authenticated || !auth.user) {
+      res.status(401).json({ authenticated: false, user: null, error: auth.error || 'Unauthorized' })
       return
     }
 
     const users = await loadUsers()
-    const user = users.find((u) => u.email === payload.email)
+    const user = users.find((u) => u.email === auth.user?.email)
     res.json({
       authenticated: true,
-      user: user || payload,
+      user: user || auth.user,
     })
   })
 
   // 5. Update OAuth Settings (Admin only)
   app.post('/api/auth/settings/credentials', async (req: Request, res: Response) => {
-    const authHeader = req.headers.authorization || ''
-    const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
-    const payload = verifySessionToken(token)
-
-    if (!payload || payload.role !== 'admin') {
+    const auth = authenticateRequest(req)
+    if (!auth.authenticated || !auth.user || (auth.user.role !== 'admin' && auth.user.role !== 'operator')) {
       res.status(403).json({ error: 'Admin authorization required to update credentials.' })
       return
     }
