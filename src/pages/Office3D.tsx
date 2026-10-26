@@ -102,12 +102,71 @@ function Character({ station, placement, layout, floor, onSelect, anchor }: { st
       <RBox position={[0, 0.98, 0]} size={[0.48, 0.58, 0.3]} radius={0.07} color={tint(colors.shirt)} roughness={0.85}/>
       <mesh ref={leftArm} position={[-0.31, 1.2, 0]} castShadow geometry={armGeometry}><meshStandardMaterial color={tint(colors.shirt)} roughness={0.85}/></mesh>
       <mesh ref={rightArm} position={[0.31, 1.2, 0]} castShadow geometry={armGeometry}><meshStandardMaterial color={tint(colors.shirt)} roughness={0.85}/></mesh>
+
+      {/* Tie Accessory (Red Necktie / Commander Tie) */}
+      {colors.tie && <RBox position={[0, 1.04, 0.158]} size={[0.08, 0.36, 0.015]} radius={0.005} color={tint(colors.tie)} roughness={0.8}/>}
+      {colors.tie && <RBox position={[0, 1.25, 0.162]} size={[0.1, 0.07, 0.015]} radius={0.005} color={tint(colors.tie)} roughness={0.8}/>}
+
+      {/* Security Padlock Shield Badge */}
+      {colors.badge === 'padlock' && <RBox position={[0.12, 1.15, 0.155]} size={[0.09, 0.1, 0.01]} radius={0.02} color="#f59e0b" roughness={0.3} metalness={0.7}/>}
+
+      {/* Head */}
       <RBox position={[0, 1.5, 0]} size={[0.4, 0.4, 0.37]} radius={0.08} color={tint(colors.skin)} roughness={0.7}/>
       <RBox position={[0, 1.72, -0.02]} size={[0.43, 0.13, 0.41]} radius={0.05} color={tint(colors.hair)} roughness={0.9}/>
       <RBox position={[0, 1.58, -0.19]} size={[0.43, 0.3, 0.06]} radius={0.03} color={tint(colors.hair)} roughness={0.9}/>
-      <RBox position={[-0.09, 1.52, 0.186]} size={[0.06, 0.07, 0.01]} radius={0.004} color="#17201e" shadow={false}/>
-      <RBox position={[0.09, 1.52, 0.186]} size={[0.06, 0.07, 0.01]} radius={0.004} color="#17201e" shadow={false}/>
+
+      {/* Sunglasses / Spectacles or Standard Eyes */}
+      {colors.glasses === 'sunglasses' ? (
+        <group>
+          {/* Black rectangular secret agent / security shades */}
+          <RBox position={[0, 1.53, 0.192]} size={[0.34, 0.09, 0.02]} radius={0.01} color="#05070a" roughness={0.2} metalness={0.8} shadow={false}/>
+          <RBox position={[0, 1.53, 0.196]} size={[0.31, 0.07, 0.01]} radius={0.005} color="#1e293b" roughness={0.1} shadow={false}/>
+        </group>
+      ) : colors.glasses === 'spectacles' ? (
+        <group>
+          {/* Scholar / Inspector spectacles */}
+          <RBox position={[-0.09, 1.52, 0.19]} size={[0.1, 0.08, 0.01]} radius={0.005} color="#cbd5e1" shadow={false}/>
+          <RBox position={[0.09, 1.52, 0.19]} size={[0.1, 0.08, 0.01]} radius={0.005} color="#cbd5e1" shadow={false}/>
+          <RBox position={[0, 1.53, 0.192]} size={[0.08, 0.015, 0.01]} radius={0.002} color="#94a3b8" shadow={false}/>
+          <RBox position={[-0.09, 1.52, 0.194]} size={[0.06, 0.06, 0.01]} radius={0.004} color="#17201e" shadow={false}/>
+          <RBox position={[0.09, 1.52, 0.194]} size={[0.06, 0.06, 0.01]} radius={0.004} color="#17201e" shadow={false}/>
+        </group>
+      ) : (
+        <group>
+          <RBox position={[-0.09, 1.52, 0.186]} size={[0.06, 0.07, 0.01]} radius={0.004} color="#17201e" shadow={false}/>
+          <RBox position={[0.09, 1.52, 0.186]} size={[0.06, 0.07, 0.01]} radius={0.004} color="#17201e" shadow={false}/>
+        </group>
+      )}
+
+      {/* Mouth */}
       <RBox position={[0, 1.4, 0.186]} size={[0.12, 0.025, 0.01]} radius={0.004} color="#9a5a44" shadow={false}/>
+
+      {/* Peaked Cap or Safety Hardhat */}
+      {colors.hat === 'hardhat' && (
+        <group>
+          {/* Construction / Safety Hardhat */}
+          <RBox position={[0, 1.77, 0]} size={[0.48, 0.15, 0.46]} radius={0.07} color={tint(colors.hatColor || '#f59e0b')} roughness={0.3}/>
+          <RBox position={[0, 1.71, 0.08]} size={[0.5, 0.035, 0.34]} radius={0.015} color={tint(colors.hatColor || '#f59e0b')} roughness={0.3}/>
+          <RBox position={[0, 1.83, 0]} size={[0.08, 0.04, 0.42]} radius={0.01} color="#d97706" roughness={0.3}/>
+        </group>
+      )}
+      {colors.hat === 'cap' && (
+        <group>
+          {/* Developer / Scout Peaked Baseball Cap */}
+          <RBox position={[0, 1.75, 0]} size={[0.45, 0.12, 0.43]} radius={0.06} color={tint(colors.hatColor || '#0284c7')} roughness={0.8}/>
+          <RBox position={[0, 1.71, 0.22]} size={[0.42, 0.03, 0.18]} radius={0.01} color={tint(colors.hatColor || '#0284c7')} roughness={0.8}/>
+        </group>
+      )}
+
+      {/* Developer Headphones */}
+      {colors.headphones && (
+        <group>
+          <RBox position={[0, 1.77, -0.02]} size={[0.46, 0.03, 0.09]} radius={0.01} color="#0f172a" roughness={0.5}/>
+          <RBox position={[-0.22, 1.5, -0.02]} size={[0.05, 0.16, 0.14]} radius={0.03} color="#00d2ff" roughness={0.4}/>
+          <RBox position={[0.22, 1.5, -0.02]} size={[0.05, 0.16, 0.14]} radius={0.03} color="#00d2ff" roughness={0.4}/>
+        </group>
+      )}
+
       {unknown && <mesh position={[0, 0.03, 0]} rotation={[-Math.PI / 2, 0, 0]}><ringGeometry args={[0.45, 0.55, 24]}/><meshBasicMaterial color="#e9c47b" transparent opacity={0.85}/></mesh>}
       <object3D ref={anchor} position={[0, 2.05, 0]}/>
     </group>
