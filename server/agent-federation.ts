@@ -412,12 +412,16 @@ export function installAgentFederation(app: Express): void {
     const federated = await loadFederatedAgents()
 
     const internalCrew = [
-      { id: 'leader', name: 'David (Leader)', role: 'Orchestrator & Chief Agent', type: 'internal', status: 'online', color: '#00d2ff' },
-      { id: 'trend-hunter', name: 'Charlie (Trend Hunter)', role: 'Market Intelligence, Syllabus & Recon', type: 'internal', status: 'online', color: '#10b981' },
-      { id: 'fullstack-dev', name: 'Alex (Fullstack Dev)', role: 'Software, Web & CTF Solver Engineering', type: 'internal', status: 'online', color: '#38bdf8' },
-      { id: 'qa-engineer', name: 'Julius (QA Engineer)', role: 'Quality, UX & Anti-Slop Assurance', type: 'internal', status: 'online', color: '#f59e0b' },
-      { id: 'security-engineer', name: 'Athena (Security Engineer)', role: 'Cyber Defense & Exploit Analysis', type: 'internal', status: 'online', color: '#ef4444' },
-      { id: 'guru', name: 'Judith (Guru)', role: 'Master Educator & LKS Competition Mentor', type: 'internal', status: 'online', color: '#a855f7' },
+      { id: 'leader', name: 'David (Tech Lead)', role: 'Chief Engineering Orchestrator & System Architect', division: 'Management', type: 'internal', status: 'online', color: '#00d2ff' },
+      { id: 'product-manager', name: 'Product Manager (PM)', role: 'Pecah Ide, User Stories & Feature Scoping', division: 'Product', type: 'internal', status: 'online', color: '#38bdf8' },
+      { id: 'trend-hunter', name: 'Charlie (Business Analyst)', role: 'Market Intelligence, Business Requirements & Recon', division: 'Product', type: 'internal', status: 'online', color: '#10b981' },
+      { id: 'designer', name: 'UI/UX Designer', role: 'Mobile/Web Wireframing & Design Tokens', division: 'Design', type: 'internal', status: 'online', color: '#c084fc' },
+      { id: 'fullstack-dev', name: 'Alex (Backend & Fullstack)', role: 'High-Performance API & Database Engineering', division: 'Engineering', type: 'internal', status: 'online', color: '#0284c7' },
+      { id: 'mobile-dev', name: 'Mobile Developer', role: 'Native & Cross-Platform Client Architecture', division: 'Engineering', type: 'internal', status: 'online', color: '#06b6d4' },
+      { id: 'devops-engineer', name: 'DevOps & Cloud Engineer', role: 'Reverse Proxy, Sandbox Daemons & CI/CD', division: 'Engineering', type: 'internal', status: 'online', color: '#eab308' },
+      { id: 'qa-engineer', name: 'Julius (QA Automation)', role: 'Bug Hunting, Test Suites & Boundary Regression', division: 'Quality & Defense', type: 'internal', status: 'online', color: '#f59e0b' },
+      { id: 'security-engineer', name: 'Athena (Cyber Defense)', role: 'Penetration Testing, Exploit Audit & RBAC Hardening', division: 'Quality & Defense', type: 'internal', status: 'online', color: '#ef4444' },
+      { id: 'guru', name: 'Judith (Technical Writer)', role: 'Documentation Lead, Technical SOP & Mentorship', division: 'Quality & Defense', type: 'internal', status: 'online', color: '#a855f7' },
     ]
 
     const federatedCrew = federated.map((agt) => ({

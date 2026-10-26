@@ -66,6 +66,45 @@ const CUSTOM_LOOKS: Record<string, Partial<AgentLook>> = {
     tie: '#f59e0b',
     glasses: 'sunglasses',
   },
+  // Product Manager (PM): Requirements & Feature Scoping
+  // Voxel style: Dark glasses, crisp navy polo, ticket organizer
+  'product-manager': {
+    hair: '#1e293b',
+    skin: '#f1c9a0',
+    shirt: '#1e3a8a',
+    pants: '#0f172a',
+    glasses: 'spectacles',
+  },
+  // UI/UX Designer: Wireframe & Visual Prototype
+  // Voxel style: Maroon beret/hair, purple boxy shirt (Agent #3 in the reel)
+  'designer': {
+    hair: '#881337',
+    skin: '#f1c9a0',
+    shirt: '#7e22ce',
+    pants: '#18181b',
+    hat: 'cap',
+    hatColor: '#881337',
+  },
+  // Mobile Developer: Native & Cross-Platform Client
+  // Voxel style: Green cap, green jacket/shirt (Agent #4 in the reel)
+  'mobile-dev': {
+    hair: '#292524',
+    skin: '#e9b57d',
+    shirt: '#15803d',
+    pants: '#1c1917',
+    hat: 'cap',
+    hatColor: '#166534',
+  },
+  // DevOps & Cloud Engineer: Infra, Daemons & CI/CD
+  // Voxel style: Yellow hardhat, industrial navy shirt
+  'devops-engineer': {
+    hair: '#334155',
+    skin: '#e9b57d',
+    shirt: '#1e293b',
+    pants: '#0f172a',
+    hat: 'hardhat',
+    hatColor: '#eab308',
+  },
   // Charlie (Trend-Hunter): Intelligence Scout
   // Voxel style: Orange explorer peaked cap, amber shirt
   'trend-hunter': {

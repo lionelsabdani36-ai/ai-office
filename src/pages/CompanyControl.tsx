@@ -589,13 +589,23 @@ export function CompanyControl() {
                     disabled={!isOperator}
                     style={{ width: '100%', minHeight: '40px', padding: '6px 10px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.82rem', opacity: !isOperator ? 0.6 : 1 }}
                   >
-                    <optgroup label="Internal AI Team (Nyawit)">
-                      <option value="leader">David (Chief Agent)</option>
-                      <option value="trend-hunter">Charlie (Intelligence)</option>
-                      <option value="fullstack-dev">Alex (Engineering)</option>
-                      <option value="qa-engineer">Julius (Quality &amp; UX)</option>
-                      <option value="security-engineer">Athena (Defense)</option>
-                      <option value="guru">Judith (Guru &amp; Knowledge)</option>
+                    <optgroup label="1. Management & Architecture">
+                      <option value="leader">David (Tech Lead &amp; Chief Orchestrator)</option>
+                    </optgroup>
+                    <optgroup label="2. Product & Design Squad">
+                      <option value="product-manager">Product Manager (Pecah Ide &amp; Backlog)</option>
+                      <option value="trend-hunter">Charlie (Business Analyst &amp; Market Recon)</option>
+                      <option value="designer">UI/UX Designer (Wireframe &amp; Prototypes)</option>
+                    </optgroup>
+                    <optgroup label="3. Core Software Engineering">
+                      <option value="fullstack-dev">Alex (Fullstack &amp; Backend Engineer)</option>
+                      <option value="mobile-dev">Mobile Developer (Client &amp; Cross-Platform)</option>
+                      <option value="devops-engineer">DevOps &amp; Cloud Infrastructure</option>
+                    </optgroup>
+                    <optgroup label="4. Quality, Security & Governance">
+                      <option value="qa-engineer">Julius (QA Automation &amp; Bug Hunter)</option>
+                      <option value="security-engineer">Athena (Cyber Defense &amp; Exploit Audit)</option>
+                      <option value="guru">Judith (Technical Writer &amp; Knowledge Master)</option>
                     </optgroup>
                     {roster.filter((a) => a.type === 'federated_guest').length > 0 && (
                       <optgroup label="Federated Guest Agents">
@@ -649,14 +659,18 @@ export function CompanyControl() {
                   value={instructAgent}
                   onChange={(e) => setInstructAgent(e.target.value)}
                   disabled={!isOperator}
-                  style={{ width: '115px', minHeight: '38px', padding: '6px 8px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.78rem', opacity: !isOperator ? 0.6 : 1 }}
+                  style={{ width: '150px', minHeight: '38px', padding: '6px 8px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.78rem', opacity: !isOperator ? 0.6 : 1 }}
                 >
-                  <option value="leader">David</option>
-                  <option value="trend-hunter">Charlie</option>
-                  <option value="fullstack-dev">Alex</option>
-                  <option value="qa-engineer">Julius</option>
-                  <option value="security-engineer">Athena</option>
-                  <option value="guru">Judith</option>
+                  <option value="leader">David (Tech Lead)</option>
+                  <option value="product-manager">PM (Product)</option>
+                  <option value="trend-hunter">Charlie (BA)</option>
+                  <option value="designer">Designer (UI/UX)</option>
+                  <option value="fullstack-dev">Alex (Fullstack)</option>
+                  <option value="mobile-dev">Mobile Dev</option>
+                  <option value="devops-engineer">DevOps Eng</option>
+                  <option value="qa-engineer">Julius (QA)</option>
+                  <option value="security-engineer">Athena (Security)</option>
+                  <option value="guru">Judith (Doc Lead)</option>
                 </select>
                 <input
                   type="text"
@@ -804,6 +818,108 @@ export function CompanyControl() {
           </div>
         </div>
 
+      </div>
+
+      
+      {/* SECTION: ORGANIZATIONAL STRUCTURE OF THE 10 AI EMPLOYEES */}
+      <div style={{ background: '#0a1122', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '24px', marginBottom: '28px', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', flexWrap: 'wrap', gap: '10px' }}>
+          <div>
+            <div style={{ fontSize: '0.72rem', fontFamily: 'monospace', color: '#00d2ff', fontWeight: 600, letterSpacing: '0.06em' }}>
+              STRUKTUR ORGANISASI TIM 10 KARYAWAN AI (ENGINEERING SQUAD)
+            </div>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#ffffff', margin: '4px 0 0 0' }}>
+              Bagan Kerja &amp; Alur Delegasi Tim Super App
+            </h2>
+          </div>
+          <span style={{ fontSize: '0.72rem', fontFamily: 'monospace', background: 'rgba(0, 210, 255, 0.1)', color: '#00d2ff', border: '1px solid rgba(0, 210, 255, 0.3)', padding: '4px 10px', borderRadius: '4px', fontWeight: 600 }}>
+            10 ROLES : FULL LIFECYCLE
+          </span>
+        </div>
+
+        {/* 4 Tier Organizational Flow */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+          
+          {/* Tier 1 */}
+          <div style={{ background: '#060913', border: '1px solid rgba(0, 210, 255, 0.25)', borderRadius: '8px', padding: '16px' }}>
+            <div style={{ fontSize: '0.7rem', color: '#00d2ff', fontFamily: 'monospace', fontWeight: 700, marginBottom: '6px' }}>
+              LEVEL 1: MANAGEMENT &amp; ARCHITECTURE
+            </div>
+            <div style={{ fontWeight: 800, color: '#ffffff', fontSize: '1rem', marginBottom: '4px' }}>
+              David (Tech Lead)
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#94a3b8', lineHeight: 1.4, marginBottom: '10px' }}>
+              Chief Engineering Orchestrator: mengawasi arsitektur sistem, delegasi sprint Kanban, dan persetujuan code review final.
+            </div>
+            <div style={{ fontSize: '0.7rem', color: '#8092a8', fontFamily: 'monospace', background: 'rgba(255, 255, 255, 0.04)', padding: '4px 8px', borderRadius: '4px' }}>
+              Voxel: Midnight Navy Suit &bull; Gold Tie &bull; Command Shades
+            </div>
+          </div>
+
+          {/* Tier 2 */}
+          <div style={{ background: '#060913', border: '1px solid rgba(56, 189, 248, 0.25)', borderRadius: '8px', padding: '16px' }}>
+            <div style={{ fontSize: '0.7rem', color: '#38bdf8', fontFamily: 'monospace', fontWeight: 700, marginBottom: '6px' }}>
+              LEVEL 2: PRODUCT &amp; DESIGN SQUAD
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div>
+                <div style={{ fontWeight: 700, color: '#38bdf8', fontSize: '0.9rem' }}>Product Manager (PM)</div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Pecah ide &amp; breakdown user stories (Login, Chat, Payment).</div>
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, color: '#10b981', fontSize: '0.9rem' }}>Charlie (Business Analyst)</div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Riset intelijen pasar, spesifikasi fungsional &amp; use case.</div>
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, color: '#c084fc', fontSize: '0.9rem' }}>UI/UX Designer (Wireframe)</div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Arsitektur visual, wireframe mobile 3-screen &amp; token desain.</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tier 3 */}
+          <div style={{ background: '#060913', border: '1px solid rgba(2, 132, 199, 0.25)', borderRadius: '8px', padding: '16px' }}>
+            <div style={{ fontSize: '0.7rem', color: '#0284c7', fontFamily: 'monospace', fontWeight: 700, marginBottom: '6px' }}>
+              LEVEL 3: SOFTWARE ENGINEERING CORE
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div>
+                <div style={{ fontWeight: 700, color: '#0284c7', fontSize: '0.9rem' }}>Alex (Backend &amp; Fullstack)</div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>High-performance API, database WAL, dan server daemons.</div>
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, color: '#06b6d4', fontSize: '0.9rem' }}>Mobile Developer</div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Client app cross-platform, native UI, &amp; offline state sync.</div>
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, color: '#eab308', fontSize: '0.9rem' }}>DevOps &amp; Cloud Engineer</div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Reverse proxy, deployment systemd, sandbox, &amp; TLS 1.3.</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tier 4 */}
+          <div style={{ background: '#060913', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '8px', padding: '16px' }}>
+            <div style={{ fontSize: '0.7rem', color: '#ef4444', fontFamily: 'monospace', fontWeight: 700, marginBottom: '6px' }}>
+              LEVEL 4: QUALITY, DEFENSE &amp; GOVERNANCE
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div>
+                <div style={{ fontWeight: 700, color: '#f59e0b', fontSize: '0.9rem' }}>Julius (QA Tester &amp; Bug Hunter)</div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Regression suites, bug detection, dan validasi input.</div>
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, color: '#ef4444', fontSize: '0.9rem' }}>Athena (Cyber Defense)</div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Pentesting, exploit auditing, dan zero-trust RBAC hardening.</div>
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, color: '#a855f7', fontSize: '0.9rem' }}>Judith (Technical Writer)</div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Dokumentasi teknis, standard operating procedures, &amp; materi.</div>
+              </div>
+            </div>
+          </div>
+
+        </div>
       </div>
 
       {/* SECTION 4: LIVE AGENT ROSTER */}

@@ -85,7 +85,18 @@ async function saveInstructions(list: DispatchedInstruction[]): Promise<void> {
   await fsp.writeFile(INSTRUCTIONS_LOG_FILE, JSON.stringify(list, null, 2), 'utf8')
 }
 
-const INTERNAL_AGENTS = ['leader', 'trend-hunter', 'fullstack-dev', 'qa-engineer', 'security-engineer', 'guru']
+const INTERNAL_AGENTS = [
+  'leader',
+  'product-manager',
+  'trend-hunter',
+  'designer',
+  'fullstack-dev',
+  'mobile-dev',
+  'devops-engineer',
+  'qa-engineer',
+  'security-engineer',
+  'guru',
+]
 
 export function installTaskDispatcher(app: Express): void {
   // 1. Create and Dispatch Task from Web UI
