@@ -85,8 +85,8 @@ const CUSTOM_LOOKS: Record<string, Partial<AgentLook>> = {
     hat: 'cap',
     hatColor: '#881337',
   },
-  // Mobile Developer: Native & Cross-Platform Client
-  // Voxel style: Green cap, green jacket/shirt (Agent #4 in the reel)
+  // Web & Mobile Developer: Modern Web (React/Vite/WebGL) & Cross-Platform Mobile
+  // Voxel style: Green cap, green jacket/shirt, developer headphones
   'mobile-dev': {
     hair: '#292524',
     skin: '#e9b57d',
@@ -94,6 +94,25 @@ const CUSTOM_LOOKS: Record<string, Partial<AgentLook>> = {
     pants: '#1c1917',
     hat: 'cap',
     hatColor: '#166534',
+    headphones: true,
+  },
+  'web-dev': {
+    hair: '#292524',
+    skin: '#e9b57d',
+    shirt: '#15803d',
+    pants: '#1c1917',
+    hat: 'cap',
+    hatColor: '#166534',
+    headphones: true,
+  },
+  'frontend-dev': {
+    hair: '#292524',
+    skin: '#e9b57d',
+    shirt: '#15803d',
+    pants: '#1c1917',
+    hat: 'cap',
+    hatColor: '#166534',
+    headphones: true,
   },
   // DevOps & Cloud Engineer: Infra, Daemons & CI/CD
   // Voxel style: Yellow hardhat, industrial navy shirt

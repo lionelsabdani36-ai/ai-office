@@ -599,7 +599,7 @@ export function CompanyControl() {
                     </optgroup>
                     <optgroup label="3. Core Software Engineering">
                       <option value="fullstack-dev">Alex (Fullstack &amp; Backend Engineer)</option>
-                      <option value="mobile-dev">Mobile Developer (Client &amp; Cross-Platform)</option>
+                      <option value="mobile-dev">Web &amp; Mobile Developer (React, Next.js &amp; Mobile Client)</option>
                       <option value="devops-engineer">DevOps &amp; Cloud Infrastructure</option>
                     </optgroup>
                     <optgroup label="4. Quality, Security & Governance">
@@ -666,7 +666,7 @@ export function CompanyControl() {
                   <option value="trend-hunter">Charlie (BA)</option>
                   <option value="designer">Designer (UI/UX)</option>
                   <option value="fullstack-dev">Alex (Fullstack)</option>
-                  <option value="mobile-dev">Mobile Dev</option>
+                  <option value="mobile-dev">Web &amp; Mobile Dev</option>
                   <option value="devops-engineer">DevOps Eng</option>
                   <option value="qa-engineer">Julius (QA)</option>
                   <option value="security-engineer">Athena (Security)</option>
@@ -888,8 +888,8 @@ export function CompanyControl() {
                 <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>High-performance API, database WAL, dan server daemons.</div>
               </div>
               <div>
-                <div style={{ fontWeight: 700, color: '#06b6d4', fontSize: '0.9rem' }}>Mobile Developer</div>
-                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Client app cross-platform, native UI, &amp; offline state sync.</div>
+                <div style={{ fontWeight: 700, color: '#06b6d4', fontSize: '0.9rem' }}>Web &amp; Mobile Developer</div>
+                <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>Aplikasi web modern (React, Vite, WebGL) &amp; klien mobile lintas platform.</div>
               </div>
               <div>
                 <div style={{ fontWeight: 700, color: '#eab308', fontSize: '0.9rem' }}>DevOps &amp; Cloud Engineer</div>

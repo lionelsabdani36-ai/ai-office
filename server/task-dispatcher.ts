@@ -92,6 +92,8 @@ const INTERNAL_AGENTS = [
   'designer',
   'fullstack-dev',
   'mobile-dev',
+  'web-dev',
+  'frontend-dev',
   'devops-engineer',
   'qa-engineer',
   'security-engineer',

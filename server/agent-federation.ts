@@ -417,7 +417,7 @@ export function installAgentFederation(app: Express): void {
       { id: 'trend-hunter', name: 'Charlie (Business Analyst)', role: 'Market Intelligence, Business Requirements & Recon', division: 'Product', type: 'internal', status: 'online', color: '#10b981' },
       { id: 'designer', name: 'UI/UX Designer', role: 'Mobile/Web Wireframing & Design Tokens', division: 'Design', type: 'internal', status: 'online', color: '#c084fc' },
       { id: 'fullstack-dev', name: 'Alex (Backend & Fullstack)', role: 'High-Performance API & Database Engineering', division: 'Engineering', type: 'internal', status: 'online', color: '#0284c7' },
-      { id: 'mobile-dev', name: 'Mobile Developer', role: 'Native & Cross-Platform Client Architecture', division: 'Engineering', type: 'internal', status: 'online', color: '#06b6d4' },
+      { id: 'mobile-dev', name: 'Web & Mobile Developer', role: 'Modern Web (React, Vite, WebGL) & Cross-Platform Mobile Apps', division: 'Engineering', type: 'internal', status: 'online', color: '#06b6d4' },
       { id: 'devops-engineer', name: 'DevOps & Cloud Engineer', role: 'Reverse Proxy, Sandbox Daemons & CI/CD', division: 'Engineering', type: 'internal', status: 'online', color: '#eab308' },
       { id: 'qa-engineer', name: 'Julius (QA Automation)', role: 'Bug Hunting, Test Suites & Boundary Regression', division: 'Quality & Defense', type: 'internal', status: 'online', color: '#f59e0b' },
       { id: 'security-engineer', name: 'Athena (Cyber Defense)', role: 'Penetration Testing, Exploit Audit & RBAC Hardening', division: 'Quality & Defense', type: 'internal', status: 'online', color: '#ef4444' },
