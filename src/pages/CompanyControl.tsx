@@ -48,10 +48,12 @@ export function CompanyControl() {
   const [roster, setRoster] = useState<AgentRosterItem[]>([])
   const [tasks, setTasks] = useState<DispatchedTaskItem[]>([])
 
-  // Login Form States
-  const [loginEmail, setLoginEmail] = useState('')
-  const [loginName, setLoginName] = useState('')
+  // Auth Mode: 'operator_key' | 'github' | 'google'
+  const [authMode, setAuthMode] = useState<'operator_key' | 'github' | 'google'>('operator_key')
+  const [operatorKeyInput, setOperatorKeyInput] = useState('')
+  const [operatorNameInput, setOperatorNameInput] = useState('White Jack (Lead Operator)')
   const [authStatus, setAuthStatus] = useState('')
+  const [showKey, setShowKey] = useState(false)
 
   // Task Creation States
   const [taskTitle, setTaskTitle] = useState('')
@@ -60,7 +62,7 @@ export function CompanyControl() {
   const [taskPriority, setTaskPriority] = useState('normal')
   const [taskStatus, setTaskStatus] = useState('')
 
-  // Instruction States
+  // Direct Instruction States
   const [instructAgent, setInstructAgent] = useState('leader')
   const [instructionText, setInstructionText] = useState('')
   const [instructStatus, setInstructStatus] = useState('')
@@ -81,20 +83,31 @@ export function CompanyControl() {
   const [joinColor, setJoinColor] = useState('#00d2ff')
   const [joinStatus, setJoinStatus] = useState('')
 
+  // Federated agent ping state
+  const [pingStatusMap, setPingStatusMap] = useState<Record<string, string>>({})
+
+  const isOperator = user?.role === 'admin' || user?.role === 'operator'
+
   // Check current session
   useEffect(() => {
-    if (!token) return
+    if (!token) {
+      setUser(null)
+      return
+    }
     fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
       .then((r) => r.json())
       .then((d) => {
-        if (d.authenticated) setUser(d.user)
-        else {
+        if (d.authenticated && d.user) {
+          setUser(d.user)
+        } else {
           localStorage.removeItem('duckvaulta_company_token')
           setToken(null)
           setUser(null)
         }
       })
-      .catch(() => {})
+      .catch(() => {
+        setUser(null)
+      })
   }, [token])
 
   // Load roster and task history
@@ -114,47 +127,54 @@ export function CompanyControl() {
     reloadData()
   }, [])
 
-  // Handle Google / GitHub Login
-  const handleOAuthLogin = async (provider: 'google' | 'github') => {
-    setAuthStatus(`Menghubungkan ke ${provider}...`)
+  // Handle Master Operator Key Login
+  const handleOperatorKeyLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!operatorKeyInput.trim()) {
+      setAuthStatus('Harap masukkan Master Operator Key.')
+      return
+    }
+    setAuthStatus('Memverifikasi Master Operator Key...')
     try {
-      const email = loginEmail || `${provider}.user@duckvaulta.ai.id`
-      const name = loginName || (provider === 'google' ? 'Google Operator' : 'GitHub Developer')
-
-      const res = await fetch(`/api/auth/oauth/${provider}`, {
+      const res = await fetch('/api/auth/operator/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, name }),
+        body: JSON.stringify({
+          key: operatorKeyInput.trim(),
+          operatorName: operatorNameInput.trim() || 'White Jack (Lead Operator)',
+        }),
       })
       const data = await res.json()
       if (data.success && data.token) {
         localStorage.setItem('duckvaulta_company_token', data.token)
         setToken(data.token)
         setUser(data.user)
-        setAuthStatus(`Berhasil masuk sebagai ${data.user.name} (${data.user.role})`)
+        setOperatorKeyInput('')
+        setAuthStatus('Autentikasi Operator Berhasil: Akses Penuh Diaktifkan.')
       } else {
-        setAuthStatus(`Gagal masuk: ${data.error || 'Terjadi kesalahan'}`)
+        setAuthStatus(`Gagal: ${data.error || 'Kunci operator tidak valid.'}`)
       }
     } catch {
-      setAuthStatus('Koneksi ke server autentikasi gagal.')
+      setAuthStatus('Koneksi ke gateway autentikasi gagal.')
     }
   }
 
+  // Handle Logout
   const handleLogout = () => {
     localStorage.removeItem('duckvaulta_company_token')
     setToken(null)
     setUser(null)
-    setAuthStatus('')
+    setAuthStatus('Sesi operator telah ditutup.')
   }
 
   // Handle Task Creation
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!token) {
-      alert('Harap login terlebih dahulu.')
+    if (!isOperator) {
+      alert('Akses Ditolak: Hanya Operator atau Admin terverifikasi yang dapat membuat tugas.')
       return
     }
-    setTaskStatus('Mengirimkan task ke tim...')
+    setTaskStatus('Memvalidasi & mengirimkan task ke tim...')
     try {
       const res = await fetch('/api/company/tasks/create', {
         method: 'POST',
@@ -171,26 +191,26 @@ export function CompanyControl() {
       })
       const data = await res.json()
       if (data.success) {
-        setTaskStatus(data.message)
+        setTaskStatus('Tugas berhasil didelegasikan dan dicatat di Kanban.')
         setTaskTitle('')
         setTaskDesc('')
         reloadData()
       } else {
-        setTaskStatus(`Gagal: ${data.error || 'Unknown error'}`)
+        setTaskStatus(`Gagal: ${data.error || 'Terjadi kesalahan sistem'}`)
       }
     } catch {
-      setTaskStatus('Gagal mengirimkan task ke server.')
+      setTaskStatus('Gagal menghubungi task dispatcher server.')
     }
   }
 
   // Handle Direct Instruction
   const handleSendInstruction = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!token) {
-      alert('Harap login terlebih dahulu.')
+    if (!isOperator) {
+      alert('Akses Ditolak: Hanya Operator atau Admin yang dapat mengirim instruksi langsung.')
       return
     }
-    setInstructStatus('Mengirim instruksi...')
+    setInstructStatus('Mengirim instruksi ke agen...')
     try {
       const res = await fetch('/api/company/instruct', {
         method: 'POST',
@@ -205,23 +225,23 @@ export function CompanyControl() {
       })
       const data = await res.json()
       if (data.success) {
-        setInstructStatus(data.message)
+        setInstructStatus(`Instruksi terkirim ke agen ${instructAgent}.`)
         setInstructionText('')
       } else {
         setInstructStatus(`Gagal: ${data.error}`)
       }
     } catch {
-      setInstructStatus('Gagal menghubungi agen.')
+      setInstructStatus('Gagal mengirimkan instruksi ke server.')
     }
   }
 
   // Handle Generate Invite Key
   const handleGenerateInvite = async () => {
-    if (!token) {
-      alert('Harap login terlebih dahulu.')
+    if (!isOperator) {
+      alert('Hanya Operator yang dapat membuat kunci undangan federasi.')
       return
     }
-    setInviteStatus('Membuat kunci undangan...')
+    setInviteStatus('Membuat kunci undangan aman...')
     try {
       const res = await fetch('/api/company/agents/invite', {
         method: 'POST',
@@ -234,7 +254,7 @@ export function CompanyControl() {
       const data = await res.json()
       if (data.success) {
         setGeneratedInviteUrl(data.invite.key)
-        setInviteStatus(`Kunci Undangan dibuat: ${data.invite.key}`)
+        setInviteStatus(`Kunci Undangan aktif: ${data.invite.key}`)
       } else {
         setInviteStatus(`Gagal: ${data.error}`)
       }
@@ -270,7 +290,7 @@ export function CompanyControl() {
       })
       const data = await res.json()
       if (data.success) {
-        setJoinStatus(`Berhasil bergabung: ${data.agent.name} terdaftar!`)
+        setJoinStatus(`Berhasil bergabung: ${data.agent.name} aktif di roster!`)
         setJoinInviteKey('')
         setJoinAgentName('')
         setJoinDesc('')
@@ -284,32 +304,81 @@ export function CompanyControl() {
     }
   }
 
+  // Ping Federated Agent Webhook
+  const handlePingAgent = async (agentId: string) => {
+    setPingStatusMap((prev) => ({ ...prev, [agentId]: 'Pinging...' }))
+    try {
+      const res = await fetch(`/api/company/agents/${agentId}/ping`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token || ''}` },
+      })
+      const d = await res.json()
+      if (d.success) {
+        setPingStatusMap((prev) => ({
+          ...prev,
+          [agentId]: d.reachable ? `OK (${d.latencyMs}ms)` : `Gagal: ${d.message || 'Offline'}`,
+        }))
+        reloadData()
+      } else {
+        setPingStatusMap((prev) => ({ ...prev, [agentId]: `Error: ${d.error}` }))
+      }
+    } catch {
+      setPingStatusMap((prev) => ({ ...prev, [agentId]: 'Unreachable' }))
+    }
+  }
+
+  // Revoke Federated Agent
+  const handleRevokeAgent = async (agentId: string, agentName: string) => {
+    if (!isOperator) {
+      alert('Hanya Operator/Admin yang dapat mencabut agen.')
+      return
+    }
+    if (!confirm(`Cabut agen ${agentName} dari jaringan federasi?`)) return
+    try {
+      const res = await fetch(`/api/company/agents/${agentId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const d = await res.json()
+      if (d.success) {
+        alert(d.message)
+        reloadData()
+      } else {
+        alert(`Gagal: ${d.error}`)
+      }
+    } catch {
+      alert('Gagal menghubungi server.')
+    }
+  }
+
   return (
     <div style={{ padding: '24px 0', maxWidth: '1440px', margin: '0 auto' }}>
       
       {/* Top Banner & Security Status */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '28px', paddingBottom: '20px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)' }}>
         <div>
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '4px 12px', borderRadius: '16px', background: 'rgba(0, 210, 255, 0.08)', border: '1px solid rgba(0, 210, 255, 0.28)', color: '#00d2ff', fontSize: '0.72rem', fontFamily: 'monospace', fontWeight: 600, letterSpacing: '0.06em', marginBottom: '10px' }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#00d2ff', boxShadow: '0 0 8px #00d2ff' }} />
-            MISSION CONTROL &amp; AGENT FEDERATION
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '4px 12px', borderRadius: '16px', background: isOperator ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0, 210, 255, 0.08)', border: isOperator ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(0, 210, 255, 0.28)', color: isOperator ? '#10b981' : '#00d2ff', fontSize: '0.72rem', fontFamily: 'monospace', fontWeight: 600, letterSpacing: '0.06em', marginBottom: '10px' }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: isOperator ? '#10b981' : '#00d2ff', boxShadow: isOperator ? '0 0 8px #10b981' : '0 0 8px #00d2ff' }} />
+            {isOperator ? 'OPERATOR MODE AKTIF (AKSES PENUH)' : 'MODE BACA (GUEST READ-ONLY)'}
           </div>
           <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.02em', margin: 0, marginBottom: '6px' }}>
             AI Company Command Center
           </h1>
           <p style={{ color: '#94a3b8', fontSize: '0.92rem', margin: 0, maxWidth: '640px', lineHeight: 1.55 }}>
-            Otentikasi OAuth terenkripsi, delegasi tugas instan dari web, dan portal federasi agen eksternal.
+            {isOperator
+              ? 'Sesi operator terverifikasi: delegasi tugas ke tim AI, eksekusi instruksi langsung, dan manajemen federasi agen.'
+              : 'Mode tamu: Anda dapat melihat status dan riwayat tugas. Masukkan Master Operator Key untuk membuka kontrol delegasi.'}
           </p>
         </div>
 
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', fontFamily: 'monospace', background: 'rgba(16, 185, 129, 0.08)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '6px 12px', borderRadius: '6px', fontWeight: 600 }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            RATE LIMIT: 120/MIN
+            RBAC: STRICT OPERATOR GATE
           </div>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', fontFamily: 'monospace', background: 'rgba(0, 210, 255, 0.08)', color: '#00d2ff', border: '1px solid rgba(0, 210, 255, 0.25)', padding: '6px 12px', borderRadius: '6px', fontWeight: 600 }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            HMAC-SHA256 TOKENS
+            HMAC-SHA256 SESSION
           </div>
         </div>
       </div>
@@ -317,58 +386,114 @@ export function CompanyControl() {
       {/* 3 Main Action Cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '24px', marginBottom: '32px' }}>
         
-        {/* CARD 1: OAUTH AUTHENTICATION */}
-        <div style={{ background: '#0a1122', border: '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)' }}>
+        {/* CARD 1: OPERATOR AUTHENTICATION */}
+        <div style={{ background: '#0a1122', border: isOperator ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.08)', borderRadius: '12px', padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', boxShadow: '0 8px 24px rgba(0, 0, 0, 0.3)' }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '14px' }}>
-              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(0, 210, 255, 0.1)', border: '1px solid rgba(0, 210, 255, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#00d2ff' }}>
+              <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: isOperator ? 'rgba(16, 185, 129, 0.15)' : 'rgba(0, 210, 255, 0.1)', border: isOperator ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid rgba(0, 210, 255, 0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: isOperator ? '#10b981' : '#00d2ff' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3M18.5 4.5l3 3"/></svg>
               </div>
               <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#ffffff', margin: 0 }}>
-                1. Autentikasi Operator (OAuth)
+                1. Autentikasi Operator
               </h2>
             </div>
 
-            {!user ? (
+            {!user || !isOperator ? (
               <div>
-                <p style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: '16px', lineHeight: 1.5 }}>
-                  Masuk menggunakan akun terverifikasi untuk mengelola tugas dan mengundang agen rekan:
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
-                  <input
-                    type="email"
-                    placeholder="Email Operator (cth: kamu@domain.com)"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    style={{ width: '100%', minHeight: '44px', padding: '10px 14px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.88rem', boxSizing: 'border-box' }}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Nama Lengkap / Identitas Operator"
-                    value={loginName}
-                    onChange={(e) => setLoginName(e.target.value)}
-                    style={{ width: '100%', minHeight: '44px', padding: '10px 14px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.88rem', boxSizing: 'border-box' }}
-                  />
+                {/* Auth Mode Tabs */}
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', borderBottom: '1px solid rgba(255, 255, 255, 0.08)', paddingBottom: '4px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode('operator_key')}
+                    style={{ background: 'transparent', border: 'none', borderBottom: authMode === 'operator_key' ? '2px solid #00d2ff' : '2px solid transparent', color: authMode === 'operator_key' ? '#00d2ff' : '#94a3b8', padding: '6px 10px', fontSize: '0.78rem', fontFamily: 'monospace', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Operator Passkey
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode('github')}
+                    style={{ background: 'transparent', border: 'none', borderBottom: authMode === 'github' ? '2px solid #00d2ff' : '2px solid transparent', color: authMode === 'github' ? '#00d2ff' : '#94a3b8', padding: '6px 10px', fontSize: '0.78rem', fontFamily: 'monospace', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    GitHub OAuth
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuthMode('google')}
+                    style={{ background: 'transparent', border: 'none', borderBottom: authMode === 'google' ? '2px solid #00d2ff' : '2px solid transparent', color: authMode === 'google' ? '#00d2ff' : '#94a3b8', padding: '6px 10px', fontSize: '0.78rem', fontFamily: 'monospace', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Google OAuth
+                  </button>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <button
-                    type="button"
-                    onClick={() => handleOAuthLogin('google')}
-                    style={{ minHeight: '44px', padding: '10px', background: '#ea4335', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'opacity 0.2s' }}
-                  >
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"/></svg>
-                    Google Login
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOAuthLogin('github')}
-                    style={{ minHeight: '44px', padding: '10px', background: '#1f242c', color: '#ffffff', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '6px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'border-color 0.2s' }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-                    GitHub Login
-                  </button>
-                </div>
+                {authMode === 'operator_key' && (
+                  <form onSubmit={handleOperatorKeyLogin}>
+                    <p style={{ color: '#94a3b8', fontSize: '0.82rem', marginBottom: '12px', lineHeight: 1.5 }}>
+                      Masukkan Master Operator Key untuk mengaktifkan izin penuh delegasi task:
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '14px' }}>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type={showKey ? 'text' : 'password'}
+                          placeholder="Master Operator Key..."
+                          value={operatorKeyInput}
+                          onChange={(e) => setOperatorKeyInput(e.target.value)}
+                          required
+                          style={{ width: '100%', minHeight: '44px', padding: '10px 42px 10px 14px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowKey(!showKey)}
+                          style={{ position: 'absolute', right: '10px', top: '10px', background: 'transparent', border: 'none', color: '#8092a8', cursor: 'pointer', fontSize: '0.75rem', fontFamily: 'monospace' }}
+                        >
+                          {showKey ? 'SEMBUNYIKAN' : 'LIHAT'}
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Nama Identitas Operator"
+                        value={operatorNameInput}
+                        onChange={(e) => setOperatorNameInput(e.target.value)}
+                        style={{ width: '100%', minHeight: '44px', padding: '10px 14px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      style={{ width: '100%', minHeight: '44px', padding: '10px', background: '#00d2ff', color: '#060913', border: 'none', borderRadius: '6px', fontWeight: 800, fontSize: '0.88rem', cursor: 'pointer', transition: 'all 0.2s' }}
+                    >
+                      Masuk sebagai Lead Operator
+                    </button>
+                  </form>
+                )}
+
+                {authMode === 'github' && (
+                  <div>
+                    <p style={{ color: '#94a3b8', fontSize: '0.82rem', marginBottom: '14px', lineHeight: 1.5 }}>
+                      Otentikasi aman menggunakan akun GitHub terdaftar. Akun tim resmi (lnell19) otomatis memperoleh status Administrator.
+                    </p>
+                    <a
+                      href="/api/auth/oauth/github?redirect=https://aicompany.duckvaulta.ai.id/#/dispatch-team"
+                      style={{ width: '100%', minHeight: '44px', padding: '10px', background: '#1f242c', color: '#ffffff', border: '1px solid rgba(255, 255, 255, 0.2)', borderRadius: '6px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', textDecoration: 'none', boxSizing: 'border-box' }}
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                      Lanjutkan dengan GitHub
+                    </a>
+                  </div>
+                )}
+
+                {authMode === 'google' && (
+                  <div>
+                    <p style={{ color: '#94a3b8', fontSize: '0.82rem', marginBottom: '14px', lineHeight: 1.5 }}>
+                      Otentikasi aman menggunakan akun Google terverifikasi. Akun pemilik (lionelsabdani36@gmail.com) memperoleh status Operator.
+                    </p>
+                    <a
+                      href="/api/auth/oauth/google?redirect=https://aicompany.duckvaulta.ai.id/#/dispatch-team"
+                      style={{ width: '100%', minHeight: '44px', padding: '10px', background: '#ea4335', color: '#ffffff', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', textDecoration: 'none', boxSizing: 'border-box' }}
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"/></svg>
+                      Lanjutkan dengan Google
+                    </a>
+                  </div>
+                )}
 
                 {authStatus && (
                   <div style={{ marginTop: '12px', fontSize: '0.8rem', color: authStatus.includes('Berhasil') ? '#10b981' : '#f87171', fontFamily: 'monospace', padding: '8px 10px', borderRadius: '4px', background: 'rgba(255, 255, 255, 0.03)' }}>
@@ -377,16 +502,16 @@ export function CompanyControl() {
                 )}
               </div>
             ) : (
-              <div style={{ background: '#060913', padding: '18px', borderRadius: '8px', border: '1px solid rgba(0, 210, 255, 0.25)' }}>
+              <div style={{ background: '#060913', padding: '18px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.35)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '14px' }}>
-                  <div style={{ width: '44px', height: '44px', borderRadius: '8px', background: '#00d2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#060913', fontSize: '1.1rem' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '8px', background: '#10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, color: '#060913', fontSize: '1.1rem' }}>
                     {user.name.charAt(0).toUpperCase()}
                   </div>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: '1rem', color: '#ffffff' }}>{user.name}</div>
+                    <div style={{ fontWeight: 700, fontSize: '0.98rem', color: '#ffffff' }}>{user.name}</div>
                     <div style={{ fontSize: '0.78rem', color: '#94a3b8', fontFamily: 'monospace' }}>{user.email}</div>
                   </div>
-                  <span style={{ marginLeft: 'auto', fontSize: '0.7rem', background: 'rgba(0, 210, 255, 0.15)', color: '#00d2ff', padding: '3px 8px', borderRadius: '4px', textTransform: 'uppercase', fontFamily: 'monospace', fontWeight: 600, border: '1px solid rgba(0, 210, 255, 0.3)' }}>
+                  <span style={{ marginLeft: 'auto', fontSize: '0.7rem', background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', padding: '3px 8px', borderRadius: '4px', textTransform: 'uppercase', fontFamily: 'monospace', fontWeight: 600, border: '1px solid rgba(16, 185, 129, 0.35)' }}>
                     {user.role}
                   </span>
                 </div>
@@ -400,8 +525,8 @@ export function CompanyControl() {
               </div>
             )}
           </div>
-          <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', fontSize: '0.74rem', color: '#8092a8', fontFamily: 'monospace' }}>
-            STATUS: {user ? 'TEROTENTIKASI (AKTIF)' : 'MENUNGGU KREDENSIAL'}
+          <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', fontSize: '0.74rem', color: isOperator ? '#10b981' : '#8092a8', fontFamily: 'monospace' }}>
+            STATUS: {isOperator ? 'OPERATOR TERVERIFIKASI (AKSES PENUH)' : 'MODE BACA (GUEST)'}
           </div>
         </div>
 
@@ -413,29 +538,45 @@ export function CompanyControl() {
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>
               </div>
               <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: '#ffffff', margin: 0 }}>
-                2. Beri Task &amp; Instruksi dari Web
+                2. Delegasikan Tugas &amp; Instruksi
               </h2>
             </div>
+
+            {!isOperator ? (
+              <div style={{ background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', borderRadius: '8px', padding: '16px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#f87171', fontWeight: 700, fontSize: '0.85rem', marginBottom: '6px' }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  Akses Delegasi Terkunci
+                </div>
+                <p style={{ color: '#94a3b8', fontSize: '0.8rem', lineHeight: 1.5, margin: 0 }}>
+                  Hanya Operator atau Administrator terverifikasi yang diizinkan untuk mendelegasikan tugas ke tim AI. Masukkan Master Operator Key di Card 1 untuk membuka akses.
+                </p>
+              </div>
+            ) : null}
 
             <form onSubmit={handleCreateTask}>
               <div style={{ marginBottom: '10px' }}>
                 <input
                   type="text"
-                  placeholder="Judul Tugas (Task Title)..."
+                  placeholder="Judul Tugas (3-120 karakter)..."
                   value={taskTitle}
                   onChange={(e) => setTaskTitle(e.target.value)}
+                  disabled={!isOperator}
+                  maxLength={120}
                   required
-                  style={{ width: '100%', minHeight: '44px', padding: '10px 14px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.88rem', boxSizing: 'border-box' }}
+                  style={{ width: '100%', minHeight: '44px', padding: '10px 14px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.88rem', boxSizing: 'border-box', opacity: !isOperator ? 0.6 : 1 }}
                 />
               </div>
               <div style={{ marginBottom: '10px' }}>
                 <textarea
-                  placeholder="Rincian deskripsi tugas & instruksi teknis..."
+                  placeholder="Rincian deskripsi tugas & instruksi teknis (5-1500 karakter)..."
                   value={taskDesc}
                   onChange={(e) => setTaskDesc(e.target.value)}
+                  disabled={!isOperator}
+                  maxLength={1500}
                   required
                   rows={2}
-                  style={{ width: '100%', padding: '10px 14px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.85rem', boxSizing: 'border-box', minHeight: '60px' }}
+                  style={{ width: '100%', padding: '10px 14px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.85rem', boxSizing: 'border-box', minHeight: '60px', opacity: !isOperator ? 0.6 : 1 }}
                 />
               </div>
 
@@ -445,9 +586,10 @@ export function CompanyControl() {
                   <select
                     value={taskAssignee}
                     onChange={(e) => setTaskAssignee(e.target.value)}
-                    style={{ width: '100%', minHeight: '40px', padding: '6px 10px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.82rem' }}
+                    disabled={!isOperator}
+                    style={{ width: '100%', minHeight: '40px', padding: '6px 10px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.82rem', opacity: !isOperator ? 0.6 : 1 }}
                   >
-                    <optgroup label="Internal AI Team">
+                    <optgroup label="Internal AI Team (Nyawit)">
                       <option value="leader">David (Chief Agent)</option>
                       <option value="trend-hunter">Charlie (Intelligence)</option>
                       <option value="fullstack-dev">Alex (Engineering)</option>
@@ -470,7 +612,8 @@ export function CompanyControl() {
                   <select
                     value={taskPriority}
                     onChange={(e) => setTaskPriority(e.target.value)}
-                    style={{ width: '100%', minHeight: '40px', padding: '6px 10px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.82rem' }}
+                    disabled={!isOperator}
+                    style={{ width: '100%', minHeight: '40px', padding: '6px 10px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.82rem', opacity: !isOperator ? 0.6 : 1 }}
                   >
                     <option value="normal">Normal</option>
                     <option value="high">High (Tinggi)</option>
@@ -481,12 +624,13 @@ export function CompanyControl() {
 
               <button
                 type="submit"
-                style={{ width: '100%', minHeight: '44px', padding: '10px', background: '#00d2ff', color: '#060913', border: 'none', borderRadius: '6px', fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', transition: 'all 0.2s ease' }}
+                disabled={!isOperator}
+                style={{ width: '100%', minHeight: '44px', padding: '10px', background: isOperator ? '#00d2ff' : 'rgba(255, 255, 255, 0.1)', color: isOperator ? '#060913' : '#8092a8', border: 'none', borderRadius: '6px', fontWeight: 800, fontSize: '0.85rem', cursor: isOperator ? 'pointer' : 'not-allowed', transition: 'all 0.2s ease' }}
               >
                 Kirim Task ke Kanban Board
               </button>
               {taskStatus && (
-                <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#10b981', fontFamily: 'monospace', padding: '4px 8px' }}>
+                <div style={{ marginTop: '8px', fontSize: '0.8rem', color: taskStatus.startsWith('Gagal') ? '#f87171' : '#10b981', fontFamily: 'monospace', padding: '4px 8px' }}>
                   {taskStatus}
                 </div>
               )}
@@ -504,7 +648,8 @@ export function CompanyControl() {
                 <select
                   value={instructAgent}
                   onChange={(e) => setInstructAgent(e.target.value)}
-                  style={{ width: '115px', minHeight: '38px', padding: '6px 8px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.78rem' }}
+                  disabled={!isOperator}
+                  style={{ width: '115px', minHeight: '38px', padding: '6px 8px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.78rem', opacity: !isOperator ? 0.6 : 1 }}
                 >
                   <option value="leader">David</option>
                   <option value="trend-hunter">Charlie</option>
@@ -518,17 +663,19 @@ export function CompanyControl() {
                   placeholder="Instruksi langsung..."
                   value={instructionText}
                   onChange={(e) => setInstructionText(e.target.value)}
-                  style={{ flex: 1, minHeight: '38px', padding: '6px 10px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.8rem' }}
+                  disabled={!isOperator}
+                  style={{ flex: 1, minHeight: '38px', padding: '6px 10px', background: '#060913', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '6px', color: '#ffffff', fontSize: '0.8rem', opacity: !isOperator ? 0.6 : 1 }}
                 />
                 <button
                   type="submit"
-                  style={{ minHeight: '38px', padding: '0 14px', background: 'rgba(245, 158, 11, 0.15)', border: '1px solid #f59e0b', color: '#f59e0b', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', fontSize: '0.78rem' }}
+                  disabled={!isOperator}
+                  style={{ minHeight: '38px', padding: '0 14px', background: isOperator ? 'rgba(245, 158, 11, 0.15)' : 'rgba(255,255,255,0.05)', border: isOperator ? '1px solid #f59e0b' : '1px solid rgba(255,255,255,0.1)', color: isOperator ? '#f59e0b' : '#8092a8', borderRadius: '6px', fontWeight: 700, cursor: isOperator ? 'pointer' : 'not-allowed', fontSize: '0.78rem' }}
                 >
                   Kirim
                 </button>
               </div>
             </form>
-            {instructStatus && <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '6px', fontFamily: 'monospace' }}>{instructStatus}</div>}
+            {instructStatus && <div style={{ fontSize: '0.75rem', color: instructStatus.startsWith('Gagal') ? '#f87171' : '#10b981', marginTop: '6px', fontFamily: 'monospace' }}>{instructStatus}</div>}
           </div>
         </div>
 
@@ -553,7 +700,8 @@ export function CompanyControl() {
                   value={inviteLabel}
                   onChange={(e) => setInviteLabel(e.target.value)}
                   placeholder="Label Undangan..."
-                  style={{ flex: 2, minHeight: '38px', padding: '6px 10px', background: '#0a1122', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '4px', color: '#ffffff', fontSize: '0.8rem' }}
+                  disabled={!isOperator}
+                  style={{ flex: 2, minHeight: '38px', padding: '6px 10px', background: '#0a1122', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '4px', color: '#ffffff', fontSize: '0.8rem', opacity: !isOperator ? 0.6 : 1 }}
                 />
                 <input
                   type="number"
@@ -561,12 +709,14 @@ export function CompanyControl() {
                   max="10"
                   value={inviteUses}
                   onChange={(e) => setInviteUses(Number(e.target.value))}
-                  style={{ width: '56px', minHeight: '38px', padding: '6px', background: '#0a1122', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '4px', color: '#ffffff', fontSize: '0.8rem', textAlign: 'center' }}
+                  disabled={!isOperator}
+                  style={{ width: '56px', minHeight: '38px', padding: '6px', background: '#0a1122', border: '1px solid rgba(255, 255, 255, 0.12)', borderRadius: '4px', color: '#ffffff', fontSize: '0.8rem', textAlign: 'center', opacity: !isOperator ? 0.6 : 1 }}
                 />
                 <button
                   type="button"
                   onClick={handleGenerateInvite}
-                  style={{ minHeight: '38px', padding: '0 12px', background: '#00d2ff', color: '#060913', border: 'none', borderRadius: '4px', fontWeight: 700, cursor: 'pointer', fontSize: '0.78rem' }}
+                  disabled={!isOperator}
+                  style={{ minHeight: '38px', padding: '0 12px', background: isOperator ? '#00d2ff' : 'rgba(255, 255, 255, 0.1)', color: isOperator ? '#060913' : '#8092a8', border: 'none', borderRadius: '4px', fontWeight: 700, cursor: isOperator ? 'pointer' : 'not-allowed', fontSize: '0.78rem' }}
                 >
                   Generate
                 </button>
@@ -579,7 +729,7 @@ export function CompanyControl() {
                   </button>
                 </div>
               )}
-              {inviteStatus && <div style={{ fontSize: '0.75rem', color: '#10b981', marginTop: '4px', fontFamily: 'monospace' }}>{inviteStatus}</div>}
+              {inviteStatus && <div style={{ fontSize: '0.75rem', color: inviteStatus.startsWith('Gagal') ? '#f87171' : '#10b981', marginTop: '4px', fontFamily: 'monospace' }}>{inviteStatus}</div>}
             </div>
 
             {/* B: Friend Agent Registration Form */}
@@ -643,14 +793,14 @@ export function CompanyControl() {
                 Daftarkan Agen Rekan ke Kompi
               </button>
               {joinStatus && (
-                <div style={{ marginTop: '8px', fontSize: '0.78rem', color: '#10b981', fontFamily: 'monospace' }}>
+                <div style={{ marginTop: '8px', fontSize: '0.78rem', color: joinStatus.startsWith('Gagal') ? '#f87171' : '#10b981', fontFamily: 'monospace' }}>
                   {joinStatus}
                 </div>
               )}
             </form>
           </div>
           <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', fontSize: '0.74rem', color: '#8092a8', fontFamily: 'monospace' }}>
-            PROTOKOL: WEBHOOK &amp; ASYNCHRONOUS POLLING
+            PROTOKOL: WEBHOOK SIGNED HMAC &amp; SSRF DEFENSE
           </div>
         </div>
 
@@ -688,8 +838,26 @@ export function CompanyControl() {
                 {agt.role}
               </p>
               {agt.owner && (
-                <div style={{ fontSize: '0.72rem', color: '#8092a8', fontFamily: 'monospace', borderTop: '1px solid rgba(255, 255, 255, 0.06)', paddingTop: '8px' }}>
-                  Pemilik: <strong style={{ color: '#ffffff' }}>{agt.owner}</strong> &bull; Selesai: {agt.tasksCompleted || 0}
+                <div style={{ fontSize: '0.72rem', color: '#8092a8', fontFamily: 'monospace', borderTop: '1px solid rgba(255, 255, 255, 0.06)', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                  <span>Pemilik: <strong style={{ color: '#ffffff' }}>{agt.owner}</strong></span>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <button
+                      type="button"
+                      onClick={() => handlePingAgent(agt.id)}
+                      style={{ padding: '3px 8px', background: 'rgba(0, 210, 255, 0.12)', border: '1px solid rgba(0, 210, 255, 0.3)', color: '#00d2ff', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
+                    >
+                      {pingStatusMap[agt.id] || 'Ping Webhook'}
+                    </button>
+                    {isOperator && (
+                      <button
+                        type="button"
+                        onClick={() => handleRevokeAgent(agt.id, agt.name)}
+                        style={{ padding: '3px 8px', background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', borderRadius: '4px', cursor: 'pointer', fontSize: '0.7rem' }}
+                      >
+                        Cabut
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

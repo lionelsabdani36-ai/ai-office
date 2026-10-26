@@ -180,7 +180,16 @@ export function installAgentFederation(app: Express): void {
       const session = verifySessionToken(token)
 
       if (!session || !session.email) {
-        res.status(401).json({ error: 'Authentication required to generate agent invitation keys.' })
+        res.status(401).json({ error: 'Autentikasi diperlukan untuk membuat kunci undangan.' })
+        return
+      }
+
+      // STRICT RBAC: Only operators and admins can create invite keys
+      if (session.role !== 'admin' && session.role !== 'operator') {
+        res.status(403).json({
+          error: 'Akses Ditolak: Hanya Operator atau Admin terverifikasi yang memiliki izin untuk membuat kunci undangan agen baru.',
+          code: 'OPERATOR_ROLE_REQUIRED',
+        })
         return
       }
 
@@ -438,5 +447,110 @@ export function installAgentFederation(app: Express): void {
       message: `Task ${taskId} completed by agent ${agent.name}.`,
       task,
     })
+  })
+
+  // 7. Ping / Health-Check a Federated Agent Webhook
+  app.post('/api/company/agents/:agentId/ping', async (req: Request, res: Response) => {
+    try {
+      const { agentId } = req.params
+      const agents = await loadFederatedAgents()
+      const agent = agents.find((a) => a.id === agentId)
+
+      if (!agent) {
+        res.status(404).json({ error: 'Agent tidak ditemukan.' })
+        return
+      }
+
+      if (!agent.endpointUrl) {
+        res.json({ success: true, reachable: false, message: 'Agent tidak memiliki endpoint webhook (Poll-only mode).' })
+        return
+      }
+
+      const t0 = Date.now()
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+      try {
+        const pingRes = await fetch(agent.endpointUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Duckvaulta-Agent-Key': agent.apiKey,
+            'User-Agent': 'Duckvaulta-Federation-Ping',
+          },
+          body: JSON.stringify({
+            event: 'ping_health_check',
+            timestamp: new Date().toISOString(),
+          }),
+          signal: controller.signal,
+        })
+        clearTimeout(timeoutId)
+        const latencyMs = Date.now() - t0
+
+        if (pingRes.ok) {
+          agent.status = 'active'
+          agent.lastSeenAt = new Date().toISOString()
+          await saveFederatedAgents(agents)
+          res.json({
+            success: true,
+            reachable: true,
+            latencyMs,
+            statusCode: pingRes.status,
+            message: `Webhook responsif (${latencyMs}ms)`,
+          })
+        } else {
+          res.json({
+            success: true,
+            reachable: false,
+            latencyMs,
+            statusCode: pingRes.status,
+            message: `Webhook mengembalikan status ${pingRes.status}`,
+          })
+        }
+      } catch (err: unknown) {
+        clearTimeout(timeoutId)
+        const msg = err instanceof Error ? err.message : 'Timeout / Unreachable'
+        res.json({
+          success: true,
+          reachable: false,
+          error: msg,
+          message: 'Webhook tidak dapat dijangkau.',
+        })
+      }
+    } catch {
+      res.status(500).json({ error: 'Gagal mengeksekusi ping agen.' })
+    }
+  })
+
+  // 8. Revoke / Remove a Federated Agent (Admin Only)
+  app.delete('/api/company/agents/:agentId', async (req: Request, res: Response) => {
+    try {
+      const authHeader = req.headers.authorization || ''
+      const token = authHeader.startsWith('Bearer ') ? authHeader.substring(7) : ''
+      const session = verifySessionToken(token)
+
+      if (!session || (session.role !== 'admin' && session.role !== 'operator')) {
+        res.status(403).json({ error: 'Hanya Operator atau Admin yang berhak mencabut agen.' })
+        return
+      }
+
+      const { agentId } = req.params
+      let agents = await loadFederatedAgents()
+      const target = agents.find((a) => a.id === agentId)
+      if (!target) {
+        res.status(404).json({ error: 'Agent tidak ditemukan.' })
+        return
+      }
+
+      agents = agents.filter((a) => a.id !== agentId)
+      await saveFederatedAgents(agents)
+
+      res.json({
+        success: true,
+        message: `Agent ${target.name} berhasil dicabut dari roster federasi.`,
+      })
+    } catch {
+      res.status(500).json({ error: 'Gagal mencabut agen.' })
+    }
   })
 }

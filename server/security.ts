@@ -201,3 +201,59 @@ export function isSafeWebhookUrl(urlStr: string): boolean {
     return false
   }
 }
+
+/**
+ * Validate Operator Master Passkey
+ */
+export function validateOperatorKey(providedKey: string): boolean {
+  if (!providedKey || typeof providedKey !== 'string') return false
+  const trimmed = providedKey.trim()
+
+  const envKey = process.env.OPERATOR_MASTER_KEY || process.env.DUCKVAULTA_MASTER_KEY
+  if (envKey && safeCompare(trimmed, envKey.trim())) {
+    return true
+  }
+
+  const keyFiles = [
+    join(process.cwd(), 'data', '.master_operator_key'),
+    join(process.cwd(), '.master_operator_key'),
+    join(process.env.HOME || '/home/lionelsabdani36', 'data', '.master_operator_key'),
+  ]
+
+  for (const f of keyFiles) {
+    try {
+      if (existsSync(f)) {
+        const stored = readFileSync(f, 'utf8').trim()
+        if (stored.length >= 8 && safeCompare(trimmed, stored)) {
+          return true
+        }
+      }
+    } catch {}
+  }
+  return false
+}
+
+/**
+ * Validates task title and description against spam, buffer repetition, and character bounds
+ */
+export function isValidTaskContent(title: unknown, description: unknown): { valid: boolean; reason?: string } {
+  if (typeof title !== 'string' || title.trim().length < 3) {
+    return { valid: false, reason: 'Judul tugas minimal 3 karakter.' }
+  }
+  if (title.length > 120) {
+    return { valid: false, reason: 'Judul tugas maksimal 120 karakter.' }
+  }
+  if (typeof description !== 'string' || description.trim().length < 5) {
+    return { valid: false, reason: 'Deskripsi tugas minimal 5 karakter.' }
+  }
+  if (description.length > 1500) {
+    return { valid: false, reason: 'Deskripsi tugas maksimal 1500 karakter.' }
+  }
+
+  // Reject repeating character sequences (fuzzing/spam detection: >= 15 consecutive identical characters)
+  if (/(.)\1{14,}/.test(title) || /(.)\1{14,}/.test(description)) {
+    return { valid: false, reason: 'Input terdeteksi sebagai spam atau pengulangan buffer karakter berlebihan.' }
+  }
+
+  return { valid: true }
+}

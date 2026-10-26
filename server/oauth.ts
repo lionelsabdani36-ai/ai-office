@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import type { Request, Response, Express } from 'express'
 import { promises as fsp } from 'node:fs'
-import { signSessionToken, verifySessionToken, sanitizeText } from './security.js'
+import { signSessionToken, verifySessionToken, sanitizeText, validateOperatorKey } from './security.js'
 
 const DATA_DIR = join(process.cwd(), 'data')
 const USERS_FILE = join(DATA_DIR, 'users.json')
@@ -94,6 +94,50 @@ export function installOAuth(app: Express): void {
     })
   })
 
+  // 1b. Master Operator Key Authentication (Zero-Trust Master Passkey)
+  app.post('/api/auth/operator/login', async (req: Request, res: Response) => {
+    try {
+      const { key, operatorName } = req.body || {}
+      if (!key || typeof key !== 'string') {
+        res.status(400).json({ error: 'Master Operator Key wajib diisi.' })
+        return
+      }
+
+      if (!validateOperatorKey(key)) {
+        res.status(401).json({ error: 'Master Operator Key tidak valid atau salah.' })
+        return
+      }
+
+      const adminUser: UserAccount = {
+        id: 'usr_lead_operator',
+        name: sanitizeText(operatorName || 'White Jack (Lead Operator)'),
+        email: 'lionelsabdani36@gmail.com',
+        provider: 'local',
+        role: 'admin',
+        createdAt: '2026-10-22T00:00:00Z',
+        lastLogin: new Date().toISOString(),
+      }
+
+      const token = signSessionToken({
+        id: adminUser.id,
+        email: adminUser.email,
+        name: adminUser.name,
+        role: 'admin',
+        provider: 'operator_key',
+      })
+
+      res.json({
+        success: true,
+        message: 'Autentikasi Lead Operator Berhasil (Role: Admin / Full Access).',
+        token,
+        user: adminUser,
+      })
+    } catch (err) {
+      console.error('Operator login error:', err)
+      res.status(500).json({ error: 'Gagal memproses autentikasi operator.' })
+    }
+  })
+
   // 2. Google OAuth Exchange / Login & Register
   app.post('/api/auth/oauth/google', async (req: Request, res: Response) => {
     try {
@@ -136,14 +180,15 @@ export function installOAuth(app: Express): void {
       }
 
       if (!user) {
-        // Register new user (quick/mock login cannot grant admin role)
+        // Register new user: only verified operator emails get admin, all others are guests
+        const isOperator = userEmail.toLowerCase() === 'lionelsabdani36@gmail.com' && Boolean(credential)
         user = {
           id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
           name: userName || userEmail.split('@')[0],
           email: userEmail.toLowerCase(),
           provider: 'google',
           avatarUrl: userAvatar,
-          role: 'member',
+          role: isOperator ? 'admin' : 'guest',
           createdAt: new Date().toISOString(),
           lastLogin: new Date().toISOString(),
         }
@@ -152,6 +197,9 @@ export function installOAuth(app: Express): void {
         user.lastLogin = new Date().toISOString()
         if (userName) user.name = userName
         if (userAvatar) user.avatarUrl = userAvatar
+        if (userEmail.toLowerCase() === 'lionelsabdani36@gmail.com' && Boolean(credential)) {
+          user.role = 'admin'
+        }
       }
 
       await saveUsers(users)
@@ -243,13 +291,14 @@ export function installOAuth(app: Express): void {
       }
 
       if (!user) {
+        const isOperator = Boolean(code) && ['lnell19', 'lionelsabdani36'].includes(userName.toLowerCase())
         user = {
           id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
           name: userName,
           email: userEmail.toLowerCase(),
           provider: 'github',
           avatarUrl: userAvatar,
-          role: 'member',
+          role: isOperator ? 'admin' : 'guest',
           createdAt: new Date().toISOString(),
           lastLogin: new Date().toISOString(),
         }
@@ -258,6 +307,9 @@ export function installOAuth(app: Express): void {
         user.lastLogin = new Date().toISOString()
         if (userName) user.name = userName
         if (userAvatar) user.avatarUrl = userAvatar
+        if (Boolean(code) && ['lnell19', 'lionelsabdani36'].includes(userName.toLowerCase())) {
+          user.role = 'admin'
+        }
       }
 
       await saveUsers(users)

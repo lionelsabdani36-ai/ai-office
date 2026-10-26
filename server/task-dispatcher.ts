@@ -3,7 +3,7 @@ import { promisify } from 'node:util'
 import { join } from 'node:path'
 import { promises as fsp } from 'node:fs'
 import type { Request, Response, Express } from 'express'
-import { verifySessionToken, sanitizeText, isSafeIdentifier } from './security.js'
+import { verifySessionToken, sanitizeText, isSafeIdentifier, isValidTaskContent } from './security.js'
 import { dispatchTaskToFederatedAgent } from './agent-federation.js'
 
 const execFileAsync = promisify(execFile)
@@ -79,7 +79,7 @@ async function saveInstructions(list: DispatchedInstruction[]): Promise<void> {
   await fsp.writeFile(INSTRUCTIONS_LOG_FILE, JSON.stringify(list, null, 2), 'utf8')
 }
 
-const INTERNAL_AGENTS = ['leader', 'trend-hunter', 'fullstack-dev', 'qa-engineer', 'security-engineer']
+const INTERNAL_AGENTS = ['leader', 'trend-hunter', 'fullstack-dev', 'qa-engineer', 'security-engineer', 'guru']
 
 export function installTaskDispatcher(app: Express): void {
   // 1. Create and Dispatch Task from Web UI
@@ -90,19 +90,34 @@ export function installTaskDispatcher(app: Express): void {
       const session = verifySessionToken(token)
 
       if (!session || !session.email) {
-        res.status(401).json({ error: 'Authentication required to create tasks.' })
+        res.status(401).json({ error: 'Autentikasi diperlukan untuk mendelegasikan tugas.' })
+        return
+      }
+
+      // STRICT RBAC: Only operators and admins can create tasks
+      if (session.role !== 'admin' && session.role !== 'operator') {
+        res.status(403).json({
+          error: 'Akses Ditolak: Hanya Operator atau Admin terverifikasi yang memiliki izin untuk mendelegasikan tugas ke tim AI.',
+          code: 'OPERATOR_ROLE_REQUIRED',
+        })
         return
       }
 
       const { title, description, assignee, priority = 'normal' } = req.body || {}
 
-      if (!title || !description || !assignee) {
-        res.status(400).json({ error: 'Title, description, and assignee are required fields.' })
+      const valCheck = isValidTaskContent(title, description)
+      if (!valCheck.valid) {
+        res.status(400).json({ error: valCheck.reason })
         return
       }
 
-      const cleanTitle = sanitizeText(title).substring(0, 200)
-      const cleanDesc = sanitizeText(description).substring(0, 4000)
+      if (!assignee) {
+        res.status(400).json({ error: 'Target agen (assignee) wajib dipilih.' })
+        return
+      }
+
+      const cleanTitle = sanitizeText(title).substring(0, 120)
+      const cleanDesc = sanitizeText(description).substring(0, 1500)
       const cleanAssignee = sanitizeText(assignee).toLowerCase()
       const cleanPriority = ['normal', 'high', 'urgent'].includes(priority) ? priority : 'normal'
 
@@ -184,13 +199,22 @@ export function installTaskDispatcher(app: Express): void {
       const session = verifySessionToken(token)
 
       if (!session || !session.email) {
-        res.status(401).json({ error: 'Authentication required to dispatch instructions.' })
+        res.status(401).json({ error: 'Autentikasi diperlukan untuk mengirim instruksi.' })
+        return
+      }
+
+      // STRICT RBAC: Only operators and admins can send direct instructions
+      if (session.role !== 'admin' && session.role !== 'operator') {
+        res.status(403).json({
+          error: 'Akses Ditolak: Hanya Operator atau Admin terverifikasi yang memiliki izin untuk mengirim instruksi langsung ke agen.',
+          code: 'OPERATOR_ROLE_REQUIRED',
+        })
         return
       }
 
       const { agent, instruction } = req.body || {}
       if (!agent || !instruction) {
-        res.status(400).json({ error: 'Agent name and instruction text are required.' })
+        res.status(400).json({ error: 'Target agen dan teks instruksi wajib diisi.' })
         return
       }
 
