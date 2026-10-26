@@ -32,6 +32,16 @@ interface DispatchedTaskItem {
   createdAt: string
 }
 
+function decodeEntities(str: string): string {
+  if (!str) return ''
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+}
+
 export function CompanyControl() {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem('duckvaulta_company_token'))
   const [user, setUser] = useState<UserProfile | null>(null)
@@ -697,17 +707,36 @@ export function CompanyControl() {
         {tasks.length === 0 ? (
           <p style={{ color: '#8092a8', fontSize: '0.88rem', margin: 0 }}>Belum ada tugas yang didelegasikan melalui web interface.</p>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {tasks.map((t) => (
-              <div key={t.id} style={{ background: '#060913', padding: '14px 18px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#ffffff', marginBottom: '2px' }}>{t.title}</div>
-                  <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{t.description}</div>
-                  <div style={{ fontSize: '0.72rem', color: '#8092a8', fontFamily: 'monospace', marginTop: '6px' }}>
-                    Assignee: <strong style={{ color: '#00d2ff' }}>{t.assignee}</strong> &bull; Oleh: {t.creatorName} &bull; {new Date(t.createdAt).toLocaleTimeString()}
+              <div
+                key={t.id}
+                style={{
+                  background: '#060913',
+                  padding: '16px 20px',
+                  borderRadius: '8px',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  gap: '16px',
+                  minWidth: 0,
+                  overflow: 'hidden',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.25)',
+                }}
+              >
+                <div style={{ minWidth: 0, flex: 1, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.94rem', color: '#ffffff', marginBottom: '4px', overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+                    {decodeEntities(t.title)}
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.5, overflowWrap: 'anywhere', wordBreak: 'break-word' }}>
+                    {decodeEntities(t.description)}
+                  </div>
+                  <div style={{ fontSize: '0.72rem', color: '#8092a8', fontFamily: 'monospace', marginTop: '8px' }}>
+                    Assignee: <strong style={{ color: '#00d2ff' }}>{t.assignee}</strong> &bull; Pembuat: {t.creatorName} &bull; {new Date(t.createdAt).toLocaleTimeString()}
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
                   <span style={{ fontSize: '0.7rem', padding: '3px 8px', borderRadius: '4px', fontFamily: 'monospace', fontWeight: 600, background: t.priority === 'urgent' ? 'rgba(239, 68, 68, 0.15)' : 'rgba(0, 210, 255, 0.1)', color: t.priority === 'urgent' ? '#f87171' : '#00d2ff', border: `1px solid ${t.priority === 'urgent' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(0, 210, 255, 0.25)'}` }}>
                     {t.priority.toUpperCase()}
                   </span>
